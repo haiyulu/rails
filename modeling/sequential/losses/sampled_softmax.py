@@ -20,6 +20,7 @@ from typing import Dict, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 from modeling.sequential.autoregressive_losses import (
     AutoregressiveLoss,
@@ -35,6 +36,7 @@ class SampledSoftmaxLoss(AutoregressiveLoss):
         softmax_temperature: float,
         model,
         activation_checkpoint: bool = False,
+        candidate_chunk_size: int = 16,
     ) -> None:
         super().__init__()
 
@@ -42,6 +44,42 @@ class SampledSoftmaxLoss(AutoregressiveLoss):
         self._softmax_temperature: float = softmax_temperature
         self._model = model
         self._activation_checkpoint: bool = activation_checkpoint
+        if candidate_chunk_size < 1:
+            raise ValueError("candidate_chunk_size must be positive")
+        self._candidate_chunk_size = candidate_chunk_size
+
+    def prefix_forward(self, output_embeddings, supervision_ids, negatives_sampler,
+                       user_memory=None, **kwargs):
+        """One causal example per row; prepare positive/negative items exactly once."""
+        supervision_ids = supervision_ids.reshape(-1)
+        positive = self._model.get_item_embeddings(supervision_ids)
+        if user_memory is None:
+            return self.jagged_forward(output_embeddings, supervision_ids, positive,
+                                       torch.ones_like(supervision_ids, dtype=positive.dtype),
+                                       negatives_sampler, **kwargs)
+        sampled_ids, negatives = negatives_sampler(supervision_ids, self._num_to_sample)
+        positives = negatives_sampler.normalize_embeddings(positive).unsqueeze(1)
+        ids = torch.cat([supervision_ids[:, None], sampled_ids], dim=1)
+        embeddings = torch.cat([positives, negatives], dim=1)
+        scorer = self._model._ndp_module
+        items = scorer.prepare_items(embeddings, ids)
+        chunks = []
+        for start in range(0, ids.shape[1], self._candidate_chunk_size):
+            chunk = items.slice_candidates(start, start + self._candidate_chunk_size)
+            def score(*unused, chunk=chunk):
+                return scorer.score_prepared(user_memory, chunk, return_auxiliary_losses=False)[0]
+            if self._activation_checkpoint and torch.is_grad_enabled():
+                from torch.utils.checkpoint import checkpoint
+                chunks.append(checkpoint(score, output_embeddings, use_reentrant=False))
+            else:
+                chunks.append(score())
+        logits = torch.cat(chunks, dim=1) / self._softmax_temperature
+        duplicate = torch.cat([torch.zeros_like(supervision_ids[:, None], dtype=torch.bool),
+                               sampled_ids == supervision_ids[:, None]], dim=1)
+        logits = logits.masked_fill(duplicate, -5e4)
+        auxiliary = items.auxiliary_losses()
+        auxiliary.update(items.diagnostics(scorer.dictionary_size))
+        return -F.log_softmax(logits, dim=1)[:, 0].mean(), auxiliary
 
     def jagged_forward(
         self,

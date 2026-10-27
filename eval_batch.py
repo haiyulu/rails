@@ -15,6 +15,9 @@
 # Main entry point to run benchmarks.
 
 from typing import List
+import argparse
+import os
+import shlex
 import subprocess
 
 default_algorithms = [
@@ -99,23 +102,24 @@ def get_cmd(
 ) -> str:
     cmd = f"CUDA_VISIBLE_DEVICES=1 python3 eval_from_checkpoint.py --eval_batch_size={batch_size} --limit_eval_to_first_n={limit_eval_to_first_n} "
     cmd += f"--include_eval_time --eval_dtype={eval_dtype} --eval_against_brute_force "
-    cmd += f"--gin_config_file={config_file} --top_k_method={algorithm}  --inference_from_ckpt={checkpoint} --master_port=12346"
+    cmd += f"--gin_config_file={shlex.quote(str(config_file))} --top_k_method={shlex.quote(algorithm)}  --inference_from_ckpt={shlex.quote(str(checkpoint))} --master_port=12346"
     return cmd
 
 
-def run_eval(dataset: str, algorithm: str, batch_size: int):
+def run_eval(dataset: str, algorithm: str, batch_size: int, config_file=None, checkpoint=None):
     cmd = get_cmd(
-        config_file=configs[dataset],
-        checkpoint=checkpoints[dataset],
+        config_file=config_file or configs[dataset],
+        checkpoint=checkpoint or checkpoints[dataset],
         batch_size=batch_size,
         algorithm=algorithm,
         limit_eval_to_first_n=limit_eval_to_first_n[dataset],
         eval_dtype="bf16",
     )
     print(cmd)
-    p = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    argv = shlex.split(cmd)
+    cuda_assignment = argv.pop(0)
+    p = subprocess.Popen(argv, env=dict(os.environ, CUDA_VISIBLE_DEVICES=cuda_assignment.split("=", 1)[1]),
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = p.communicate()
     result = None
     if p.returncode == 0:
@@ -129,10 +133,20 @@ def run_eval(dataset: str, algorithm: str, batch_size: int):
     return result
 
 
-def eval(dataset: str, batch_size: int) -> List[str]:
+def eval(dataset: str, batch_size: int, scorer_type="MoL", config_file=None, checkpoint=None) -> List[str]:
     eval_data = []
-    for algorithm in configured_algorithms.get(dataset, default_algorithms):
-        result = run_eval(dataset=dataset, algorithm=algorithm, batch_size=batch_size)
+    exact = {"DotProduct": "MIPSBruteForceTopK", "ExpertHistory": "LearnedBruteForceTopK"}
+    if scorer_type not in ("DotProduct", "MoL", "ExpertHistory"):
+        raise ValueError(f"Unknown scorer type {scorer_type}")
+    if scorer_type == "ExpertHistory" and (config_file is None or checkpoint is None):
+        raise ValueError("ExpertHistory evaluation requires its config and checkpoint")
+    algorithms = ([exact[scorer_type]] if scorer_type in exact
+                  else configured_algorithms.get(dataset, default_algorithms))
+    for algorithm in algorithms:
+        result = run_eval(dataset=dataset, algorithm=algorithm, batch_size=batch_size,
+                          config_file=config_file, checkpoint=checkpoint)
+        if result is None:
+            raise RuntimeError(f"Evaluation failed: {algorithm}")
         if len(eval_data) == 0:
             eval_data.append("algorithm," + result[0])
         eval_data.append(algorithm + "," + result[1])
@@ -140,10 +154,14 @@ def eval(dataset: str, batch_size: int) -> List[str]:
 
 
 if __name__ == "__main__":
-    # dataset = "amzn-books"
-    # dataset = "ml-1m"
-    dataset = "ml-20m"
-    batch_size = 32
-    result = eval(dataset=dataset, batch_size=batch_size)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", choices=list(configs), default="ml-20m")
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--scorer", choices=("DotProduct", "MoL", "ExpertHistory"), default="MoL")
+    parser.add_argument("--config")
+    parser.add_argument("--checkpoint")
+    args = parser.parse_args()
+    dataset = args.dataset
+    result = eval(dataset, args.batch_size, args.scorer, args.config, args.checkpoint)
     print(f"================{dataset}===============")
     print("\n".join(result))

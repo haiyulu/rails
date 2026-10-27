@@ -15,14 +15,34 @@
 # Defines an utility function to invoke different TopK modules.
 
 import torch
+import gin
 
 from indexing.candidate_index import CandidateIndex
 from rails.indexing.candidate_index import TopKModule
 from rails.indexing.mol_top_k import MoLBruteForceTopK, MoLNaiveTopK, MoLAvgTopK, MoLCombTopK
 from rails.indexing.mips_top_k import MIPSBruteForceTopK
+from rails.indexing.learned_top_k import LearnedBruteForceTopK
 
 
-def get_top_k_module(top_k_method: str, model: torch.nn.Module, item_embeddings: torch.Tensor, item_ids: torch.Tensor) -> TopKModule:
+def get_exact_top_k_method(model):
+    scorer = getattr(model, "_ndp_module", model)
+    method = getattr(scorer, "exact_top_k_method", None)
+    if method is not None:
+        return method
+    from rails.similarities.dot_product_similarity_fn import DotProductSimilarity
+    from rails.similarities.mol.similarity_fn import MoLSimilarity
+    if isinstance(scorer, MoLSimilarity):
+        return "MoLBruteForceTopK"
+    if isinstance(scorer, DotProductSimilarity):
+        return "MIPSBruteForceTopK"
+    raise ValueError(f"No exact retrieval method for {type(scorer).__name__}")
+
+
+@gin.configurable
+def get_top_k_module(top_k_method: str, model: torch.nn.Module, item_embeddings: torch.Tensor, item_ids: torch.Tensor, candidate_chunk_size: int = 256) -> TopKModule:
+    if top_k_method == "LearnedBruteForceTopK":
+        return LearnedBruteForceTopK(model._ndp_module, item_embeddings, item_ids,
+                                     candidate_chunk_size, source_model=model)
     if top_k_method == "MIPSBruteForceTopK":
         top_k_module = MIPSBruteForceTopK(
             item_embeddings=item_embeddings,

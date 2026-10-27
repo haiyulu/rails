@@ -709,6 +709,9 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
         past_embeddings: torch.Tensor,
         past_payloads: Dict[str, torch.Tensor],
         batch_id: Optional[int] = None,
+        sampled_targets=None,
+        negatives_sampler=None,
+        sampled_loss=None,
     ) -> torch.Tensor:
         """
         Runs the main encoder.
@@ -730,6 +733,9 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
             past_embeddings=past_embeddings,
             past_payloads=past_payloads,
         )
+        if sampled_targets is not None:
+            return self.sampled_prefix_loss(encoded_embeddings, past_lengths, past_ids, past_payloads,
+                                            sampled_targets, negatives_sampler, sampled_loss)
         return encoded_embeddings
 
     def _encode(

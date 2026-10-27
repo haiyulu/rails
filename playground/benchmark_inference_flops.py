@@ -29,8 +29,8 @@ from modeling.sequential.encoder_utils import get_sequential_encoder
 from modeling.sequential.input_features_preprocessors import LearnablePositionalEmbeddingInputFeaturesPreprocessor
 from modeling.sequential.output_postprocessors import L2NormEmbeddingPostprocessor, LayerNormEmbeddingPostprocessor
 from modeling.similarity_utils import get_similarity_function
-from inference_flops_counter import ArithmeticLedger, sum_totals
-from run_ml1m_benchmark import MODELS, LABELS
+from playground.inference_flops_counter import ArithmeticLedger, sum_totals
+from playground.model_registry import BASELINE_MODELS, MODEL_SPECS, MODELS, LABELS
 
 
 def dump(path, value):
@@ -138,6 +138,57 @@ class SplitInference:
         return scores
 
 
+class ExpertHistoryInference(SplitInference):
+    FORBIDDEN = SplitInference.FORBIDDEN + ("history.prepare", "item.prepare", "model.prepare")
+
+    def __init__(self, model, item_l2_norm=True, normalization_eps=1e-6, candidate_chunk_size=256):
+        super().__init__(model, False)
+        self.item_l2_norm = item_l2_norm
+        self.normalization_eps = normalization_eps
+        self.candidate_chunk_size = candidate_chunk_size
+        self.FORBIDDEN = self.FORBIDDEN + tuple(
+            name for name, _ in model.named_modules()
+            if name.startswith(("_ndp_module.history_key", "_ndp_module.history_value",
+                                "_ndp_module.item_experts.", "_ndp_module.memory_projections.",
+                                "_ndp_module.value_query", "_ndp_module.expert_gate",
+                                "_ndp_module.sparse_coder")))
+
+    def prepare_model(self):
+        self.calls["model.prepare"] += 1
+        return self.model._ndp_module.prepare_model()
+
+    def prepare_user(self, fixture):
+        self.calls["history.encode"] += 1
+        self.calls["history.prepare"] += 1
+        ids, lengths, payloads = fixture
+        h, memory = self.model.encode_with_history(
+            lengths, ids, self.model.get_item_embeddings(ids), payloads)
+        return {"h": h, "memory": memory}
+
+    def prepare_items(self, ids):
+        self.calls["item.prepare"] += 1
+        embedding = self.model.get_item_embeddings(ids)
+        if self.item_l2_norm:
+            embedding = F.normalize(embedding, dim=-1, eps=self.normalization_eps)
+        return self.model._ndp_module.prepare_items(embedding.unsqueeze(0), ids.unsqueeze(0))
+
+    def score(self, user, items):
+        return torch.cat([self.model._ndp_module.score_prepared(
+            user["memory"], items.slice_candidates(start, start + self.candidate_chunk_size))[0]
+            for start in range(0, items.num_candidates, self.candidate_chunk_size)], dim=1)
+
+    def original(self, fixture, ids):
+        user = self.prepare_user(fixture)
+        embedding = self.model.get_item_embeddings(ids)
+        if self.item_l2_norm:
+            embedding = F.normalize(embedding, dim=-1, eps=self.normalization_eps)
+        return torch.cat([self.model.similarity_fn(
+            user["h"], ids[start:start + self.candidate_chunk_size].unsqueeze(0),
+            embedding[start:start + self.candidate_chunk_size].unsqueeze(0),
+            user_memory=user["memory"])[0]
+            for start in range(0, ids.numel(), self.candidate_chunk_size)], dim=1)
+
+
 def fixture(catalog, batch, length):
     ids = torch.zeros(batch, 211, dtype=torch.long, device="cuda")
     index = torch.arange(batch * length, device="cuda").reshape(batch, length) % catalog.numel()
@@ -166,10 +217,31 @@ def write_csv(path, rows):
         writer.writerows(rows)
 
 
+def measure_latency_ms(function, repeats=10):
+    """Optional benchmark measurement, called only by --measure-latency."""
+    if repeats < 1:
+        raise ValueError("latency repeats must be positive")
+    for _ in range(2):
+        function()
+    torch.cuda.synchronize()
+    start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    start.record()
+    for _ in range(repeats):
+        function()
+    stop.record()
+    stop.synchronize()
+    return start.elapsed_time(stop) / repeats
+
+
 def make_report(output, results, catalog_size):
     flat = []
     for result in results:
         row = {key: result[key] for key in ("model", "B", "L", "T", "N")}
+        row.update(user_cache_bytes=result.get("user_cache_bytes"),
+                   item_cache_bytes=result.get("item_cache_bytes"),
+                   peak_memory_bytes=result.get("peak_memory_bytes"))
+        for name in ("user", "items", "scoring", "cached_catalog", "uncached_catalog"):
+            row[f"{name}_latency_ms"] = result.get("latency_ms", {}).get(name)
         for bucket in ("user", "items", "scoring", "cached_total", "uncached_total"):
             for key, value in result[bucket].items():
                 row[f"{bucket}_{key}"] = json.dumps(value, sort_keys=True) if isinstance(value, dict) else value
@@ -179,10 +251,11 @@ def make_report(output, results, catalog_size):
         flat.append(row)
     write_csv(output / "sweep.csv", flat)
     headline = [row for row in flat if row["B"] == 1 and row["L"] == 200 and row["N"] == catalog_size]
-    baseline = next(row for row in headline if row["model"] == "sasrec")
+    baseline = next((row for row in headline if row["model"] == "sasrec"), headline[0])
     for row in headline:
+        row["reference_model"] = baseline["model"]
         for metric in ("user_arithmetic_flops", "scoring_flops_per_pair", "cached_total_arithmetic_flops", "uncached_total_arithmetic_flops"):
-            row[f"{metric}_vs_sasrec"] = row[metric] / baseline[metric]
+            row[f"{metric}_vs_reference"] = row[metric] / baseline[metric]
     write_csv(output / "comparison.csv", headline)
     lines = ["# Inference FLOPs comparison", "",
         f"ML-1M checkpoints; B=1 user, L=200 valid history items, T=211 padded positions, N={catalog_size:,} shared candidates.",
@@ -199,12 +272,13 @@ def make_report(output, results, catalog_size):
         lines.append("| " + " | ".join(columns) + " |")
     lines += ["", "Cached entire model = user + strict scoring. Uncached entire model additionally prepares the shared catalog once.",
         "Query/component projections and query-only gates are charged to the user. Candidate projections and item-only gates are charged to candidate preparation.",
-        "Ranking, filtering, input transfers, and cache construction infrastructure are excluded.", "",
-        "## Ratios versus SASRec", "",
+        "Sorting, support selection, comparisons, and gathers are reported separately from floating arithmetic.",
+        "ExpertHistory includes tail exclusion and memory construction; model-only preparation is recorded in the manifest.", "",
+        f"## Ratios versus {LABELS[baseline['model']]}", "",
         "| Model | User arithmetic | Strict scoring/pair | Entire cached | Entire uncached |",
         "|---|---:|---:|---:|---:|"]
     for row in headline:
-        lines.append("| " + " | ".join([LABELS[row["model"]]] + [f'{row[k+"_vs_sasrec"]:.3f}×' for k in
+        lines.append("| " + " | ".join([LABELS[row["model"]]] + [f'{row[k+"_vs_reference"]:.3f}×' for k in
             ("user_arithmetic_flops", "scoring_flops_per_pair", "cached_total_arithmetic_flops", "uncached_total_arithmetic_flops")]) + " |")
     lines += ["", "## Special-function evaluations (not included in arithmetic FLOPs)", "",
         "| Model | User | Candidate preparation | Strict scoring, all candidates |",
@@ -224,6 +298,16 @@ def make_report(output, results, catalog_size):
         "- Input width is fixed at 211. Causal masks do not eliminate the executed dense attention products. HSTU pointwise work follows valid lengths, while its attention remains padded.",
         "- These are logical-operation counts, not GPU instructions or measured latency. Special-function costs are not priced as hardware-equivalent FLOPs.",
         "- See sweep.csv, operation_ledger.json, validation.json, coverage.md, and manifest.json for details.", ""]
+    if any(result.get("latency_ms") for result in results):
+        lines += ["", "## Optional measured latency", "",
+                  "Catalog scoring includes candidate chunks and score concatenation; ranking and seen-item filtering are separate.",
+                  "| Model | User ms | Item preparation ms | Scoring ms | Cached catalog ms | Uncached catalog ms | Peak GiB |",
+                  "|---|---:|---:|---:|---:|---:|---:|"]
+        for row in headline:
+            times = [row[f"{key}_latency_ms"] for key in ("user", "items", "scoring", "cached_catalog", "uncached_catalog")]
+            if all(value is not None for value in times):
+                lines.append("| " + " | ".join([LABELS[row["model"]]] + [f"{value:.4f}" for value in times]
+                             + [f"{row['peak_memory_bytes'] / 2**30:.3f}"]) + " |")
     (output / "comparison.md").write_text("\n".join(lines))
 
 
@@ -232,8 +316,12 @@ def main():
     parser.add_argument("--checkpoint-root", type=Path, default=ROOT / "playground/benchmark_runs/20261026-201653")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--smoke", action="store_true", help="One headline case per model for development")
-    parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(MODELS))
+    parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(BASELINE_MODELS))
+    parser.add_argument("--measure-latency", action="store_true", help="Explicitly enable CUDA-event timing")
+    parser.add_argument("--latency-repeats", type=int, default=10)
     args = parser.parse_args()
+    if args.latency_repeats < 1:
+        parser.error("--latency-repeats must be positive")
     output = (args.output_dir or ROOT / "playground/inference_flops_runs" /
         datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d-%H%M%S-%f")).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -244,6 +332,7 @@ def main():
     catalog = torch.tensor(dataset.all_item_ids, dtype=torch.long, device="cuda")
     catalog_size = catalog.numel()
     manifest = {"status": "running", "smoke": args.smoke, "output": str(output),
+        "measure_latency": args.measure_latency, "latency_repeats": args.latency_repeats,
         "checkpoint_root": str(args.checkpoint_root.resolve()), "torch": torch.__version__,
         "python": sys.version, "gpu": torch.cuda.get_device_name(0), "dtype": "float32",
         "tf32": False, "seed": 42, "catalog_size": catalog_size, "models": {},
@@ -251,7 +340,10 @@ def main():
         "source_sha256": {str(p.relative_to(ROOT)): sha(p) for p in
             [Path(__file__).resolve(), ROOT / "playground/inference_flops_counter.py",
              ROOT / "modeling/sequential/sasrec.py", ROOT / "modeling/sequential/hstu.py",
-             ROOT / "rails/similarities/mol/similarity_fn.py", ROOT / "modeling/similarity_utils.py"]}}
+             ROOT / "rails/similarities/mol/similarity_fn.py", ROOT / "modeling/similarity_utils.py",
+             ROOT / "rails/similarities/expert_history/similarity_fn.py",
+             ROOT / "rails/similarities/expert_history/sparse_coding.py",
+             ROOT / "rails/similarities/expert_history/states.py", ROOT / "playground/model_registry.py"]}}
     dump(output / "manifest.json", manifest)
     (output / "requirements.lock.txt").write_text(subprocess.check_output(
         ["uv", "pip", "freeze", "--python", sys.executable], text=True))
@@ -260,14 +352,28 @@ def main():
     try:
         with torch.inference_mode(), torch.compiler.set_stance("force_eager"):
             for model_name in args.models:
-                model, provenance = load_model(model_name, args.checkpoint_root, dataset)
+                with torch.inference_mode(False):
+                    model, provenance = load_model(model_name, args.checkpoint_root, dataset)
                 manifest["models"][model_name] = provenance
-                adapter = SplitInference(model, "mol" in model_name)
+                spec = MODEL_SPECS[model_name]
+                adapter = (ExpertHistoryInference(model, gin.query_parameter("train_fn.item_l2_norm"),
+                                                   gin.query_parameter("train_fn.l2_norm_eps"))
+                           if spec.inference_adapter == "expert_history"
+                           else SplitInference(model, spec.inference_adapter == "mol"))
+                if isinstance(adapter, ExpertHistoryInference):
+                    model_state, model_ledger, _ = counted(adapter, adapter.prepare_model, "model_only")
+                    manifest["models"][model_name]["model_only_preparation"] = model_ledger.totals()
+                    manifest["models"][model_name]["model_only_cache_bytes"] = model_state.numel() * model_state.element_size()
+                manifest["models"][model_name].update(
+                    scorer=spec.scorer, exact_top_k=spec.exact_top_k,
+                    inference_adapter=spec.inference_adapter,
+                    parameter_count=sum(p.numel() for p in model.parameters()))
                 shapes = [(1, 200, catalog_size)] if args.smoke else itertools.product(
                     [1, 32], [10, 50, 100, 200], [1, 100, 1000, catalog_size])
                 for batch, length, n in shapes:
                     print(f"COUNT {model_name} B={batch} L={length} N={n}", flush=True)
                     inputs, ids = fixture(catalog, batch, length), catalog[:n]
+                    torch.cuda.reset_peak_memory_stats()
                     user, u, u_calls = counted(adapter, lambda: adapter.prepare_user(inputs), "U")
                     items, i, i_calls = counted(adapter, lambda: adapter.prepare_items(ids), "I")
                     scores, s, s_calls = counted(adapter, lambda: adapter.score(user, items), "S")
@@ -291,10 +397,11 @@ def main():
                     torch.testing.assert_close(cache_scores, scores, rtol=0, atol=0)
                     assert full.totals() == sum_totals(u.totals(), i.totals(), s.totals())
                     assert cache.totals() == sum_totals(u.totals(), s.totals())
-                    expected_matrix = (20480 if adapter.mol else 100) * batch * n
-                    expected_arithmetic = (21117 if adapter.mol else 100) * batch * n
-                    assert s.totals()["matrix_flops"] == expected_matrix, s.totals()
-                    assert s.totals()["arithmetic_flops"] == expected_arithmetic, s.totals()
+                    if not isinstance(adapter, ExpertHistoryInference):
+                        expected_matrix = (20480 if adapter.mol else 100) * batch * n
+                        expected_arithmetic = (21117 if adapter.mol else 100) * batch * n
+                        assert s.totals()["matrix_flops"] == expected_matrix, s.totals()
+                        assert s.totals()["arithmetic_flops"] == expected_arithmetic, s.totals()
                     if adapter.mol:
                         assert s.totals()["special_functions"] == {"sigmoid": 160 * batch * n, "exp": 32 * batch * n}
                     profiler = {}
@@ -306,8 +413,20 @@ def main():
                         profiler[bucket] = counter.get_total_flops()
                         assert profiler[bucket] == ledger.totals()["matrix_flops"], (bucket, profiler, ledger.totals())
                     case = {"model": model_name, "B": batch, "L": length, "T": 211, "N": n}
+                    resources = ({"user_cache_bytes": user["memory"].num_bytes(),
+                                  "item_cache_bytes": items.num_bytes(),
+                                  "diagnostics": {k: float(v) for k, v in items.diagnostics(model._ndp_module.dictionary_size).items()}}
+                                 if isinstance(adapter, ExpertHistoryInference) else {})
+                    if args.measure_latency:
+                        resources["latency_ms"] = {
+                            "user": measure_latency_ms(lambda: adapter.prepare_user(inputs), args.latency_repeats),
+                            "items": measure_latency_ms(lambda: adapter.prepare_items(ids), args.latency_repeats),
+                            "scoring": measure_latency_ms(lambda: adapter.score(user, items), args.latency_repeats),
+                            "cached_catalog": measure_latency_ms(cached, args.latency_repeats),
+                            "uncached_catalog": measure_latency_ms(uncached, args.latency_repeats)}
+                    resources["peak_memory_bytes"] = torch.cuda.max_memory_allocated()
                     results.append(case | {"user": u.totals(), "items": i.totals(), "scoring": s.totals(),
-                        "cached_total": cache.totals(), "uncached_total": full.totals()})
+                        "cached_total": cache.totals(), "uncached_total": full.totals(), **resources})
                     validations.append(case | {"max_absolute_score_error": error,
                         "boundary_calls": {"U": u_calls, "I": i_calls, "S": s_calls},
                         "reconciliation": "exact", "profiler_matrix_crosscheck": profiler})
@@ -315,6 +434,7 @@ def main():
                         ledgers.append(case | {"bucket": ledger.bucket, "operations": list(ledger.rows.values())})
                         observed.update(ledger.observed)
                     dump(output / "validation.json", validations)
+                    del user, items, scores, original, full_scores, cache_scores, inputs, ids
                 adapter.close()
                 del adapter, model
                 dump(output / "manifest.json", manifest)
@@ -324,8 +444,11 @@ def main():
                     if (first["B"], first["L"]) == (second["B"], second["L"]):
                         assert first["user"] == second["user"]
                     assert first["items"]["arithmetic_flops"] * second["N"] == second["items"]["arithmetic_flops"] * first["N"]
-                    assert first["scoring"]["arithmetic_flops"] * second["B"] * second["N"] == second["scoring"]["arithmetic_flops"] * first["B"] * first["N"]
-                if ("mol" in first["model"]) == ("mol" in second["model"]) and (first["B"], first["N"]) == (second["B"], second["N"]):
+                    if MODEL_SPECS[first["model"]].scorer != "ExpertHistory":
+                        assert first["scoring"]["arithmetic_flops"] * second["B"] * second["N"] == second["scoring"]["arithmetic_flops"] * first["B"] * first["N"]
+                if (MODEL_SPECS[first["model"]].scorer == MODEL_SPECS[second["model"]].scorer
+                    and MODEL_SPECS[first["model"]].scorer != "ExpertHistory"
+                    and (first["B"], first["N"]) == (second["B"], second["N"])):
                     assert first["scoring"] == second["scoring"]
         dump(output / "operation_ledger.json", ledgers)
         dump(output / "results.json", results)

@@ -1,0 +1,16 @@
+include 'configs/ml-1m/sasrec-sampled-softmax-n128-final.gin'
+
+train_fn.interaction_module_type = "ExpertHistory"
+train_fn.top_k_method = "LearnedBruteForceTopK"
+train_fn.supervision_mode = "sampled_prefix"
+train_fn.temperature = 1.0
+train_fn.loss_weights = {"sparse_code_loss": 0.1}
+train_fn.custom_date_str = "expert-history"
+
+create_expert_history_interaction_module.num_item_experts = 2
+create_expert_history_interaction_module.dictionary_size = 32
+create_expert_history_interaction_module.max_active_latents = 2
+create_expert_history_interaction_module.events_per_slot = 16
+create_expert_history_interaction_module.sparse_coding_steps = 8
+create_expert_history_interaction_module.sparse_l1_weight = 0.01
+create_expert_history_interaction_module.attention_heads_per_expert = 1

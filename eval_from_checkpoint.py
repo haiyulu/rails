@@ -75,7 +75,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data.reco_dataset import get_reco_dataset
 from data.eval import _avg, get_eval_state, eval_metrics_v2_from_tensors
-from indexing.utils_rails import get_top_k_module
+from indexing.utils_rails import get_top_k_module, get_exact_top_k_method
 from modeling.sequential.autoregressive_losses import (
     InBatchNegativesSampler,
     LocalNegativesSampler,
@@ -206,9 +206,13 @@ def train_fn(
     enable_tf32: bool = False,
     opt_enable_apex: bool = False,
     metrics_output: str = "",
+    supervision_mode: str = "all_positions",
+    random_seed: int = 42,
+    benchmark_output_dir: str = "",
+    smoke_steps: int = 0,
 ) -> None:
-    random.seed(42)
-    torch.manual_seed(42)
+    random.seed(random_seed)
+    torch.manual_seed(random_seed)
 
     if eval_dtype == "bf16":
         logging.info("Enabling eval in bf16 to speed up.")
@@ -401,7 +405,7 @@ def train_fn(
                 all_item_ids=dataset.all_item_ids,
                 negatives_sampler=negatives_sampler,
                 top_k_module_fn=lambda item_embeddings, item_ids: get_top_k_module(
-                    top_k_method="MoLBruteForceTopK",
+                    top_k_method=get_exact_top_k_method(model.module),
                     model=model.module,
                     item_embeddings=item_embeddings,
                     item_ids=item_ids,

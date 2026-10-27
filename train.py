@@ -57,6 +57,7 @@ from modeling.sequential.losses.sampled_softmax import SampledSoftmaxLoss
 from modeling.sequential.embedding_modules import EmbeddingModule, LocalEmbeddingModule
 from modeling.sequential.encoder_utils import get_sequential_encoder
 from modeling.sequential.features import movielens_seq_features_from_row
+from modeling.sequential.prefix_sampling import sample_causal_prefix
 from modeling.sequential.input_features_preprocessors import (
     LearnablePositionalEmbeddingInputFeaturesPreprocessor,
 )
@@ -149,7 +150,14 @@ def train_fn(
     random_seed: int = 42,
     benchmark_output_dir: str = "",
     smoke_steps: int = 0,
+    supervision_mode: str = "all_positions",
 ) -> None:
+    if supervision_mode not in ("all_positions", "sampled_prefix"):
+        raise ValueError(f"Unknown supervision_mode {supervision_mode}")
+    if interaction_module_type == "ExpertHistory" and supervision_mode != "sampled_prefix":
+        raise ValueError("ExpertHistory training requires sampled_prefix supervision")
+    if supervision_mode == "sampled_prefix" and loss_module != "SampledSoftmaxLoss":
+        raise ValueError("sampled_prefix requires SampledSoftmaxLoss")
     # to enable more deterministic results.
     if benchmark_output_dir and world_size != 1:
         raise ValueError("Benchmark checkpoint/metric recording requires a single GPU")
@@ -292,7 +300,8 @@ def train_fn(
     model = model.to(device)
     ar_loss = ar_loss.to(device)
     negatives_sampler = negatives_sampler.to(device)
-    model = DDP(model, device_ids=[rank], broadcast_buffers=False)
+    model = DDP(model, device_ids=[rank], broadcast_buffers=False,
+                find_unused_parameters=supervision_mode == "sampled_prefix")
 
     # TODO: wrap in create_optimizer.
     opt = torch.optim.AdamW(
@@ -316,6 +325,8 @@ def train_fn(
         model_desc += f"-fe{full_eval_every_n}"
     if positional_sampling_ratio is not None and positional_sampling_ratio < 1:
         model_desc += f"-d{positional_sampling_ratio}"
+    if supervision_mode != "all_positions":
+        model_desc += f"-{supervision_mode}"
     # creates subfolders.
     os.makedirs(f"./exps/{model_subfolder}", exist_ok=True)
     os.makedirs(f"./ckpts/{model_subfolder}", exist_ok=True)
@@ -341,9 +352,15 @@ def train_fn(
     last_training_time = time.time()
     # torch.autograd.set_detect_anomaly(True)
 
-    batch_id = 0
+    batch_id = checkpoint.get("batch_id", 0) if restore_from_ckpt else 0
+    target_exposures = (checkpoint.get("training_metadata", {}).get("target_exposures", 0)
+                        if restore_from_ckpt else 0)
+    if restore_from_ckpt and checkpoint.get("training_metadata", {}).get("supervision_mode", supervision_mode) != supervision_mode:
+        raise ValueError("Checkpoint supervision mode differs from the requested mode")
+    prefix_generator = torch.Generator(device=f"cuda:{rank}")
     benchmark_started = time.time()
-    best_hr10 = float("-inf")
+    best_hr10 = (checkpoint.get("best_hr10", checkpoint.get("metrics", {}).get("hr@10", float("-inf")))
+                 if restore_from_ckpt else float("-inf"))
     if benchmark_output_dir:
         os.makedirs(benchmark_output_dir, exist_ok=True)
         with open(os.path.join(benchmark_output_dir, "operative_config.gin"), "w") as f:
@@ -403,26 +420,34 @@ def train_fn(
 
             # TODO: consider separating this out?
             B, N = seq_features.past_ids.shape
-            seq_features.past_ids.scatter_(
-                dim=1,
-                index=seq_features.past_lengths.view(-1, 1),
-                src=target_ids.view(-1, 1),
-            )
+            if supervision_mode == "sampled_prefix":
+                # Stateless per-step seeding also preserves cuts across epoch-boundary resume.
+                prefix_generator.manual_seed(random_seed + rank + batch_id * world_size)
+                seq_features, prefix_targets = sample_causal_prefix(seq_features, target_ids, prefix_generator)
+            else:
+                seq_features.past_ids.scatter_(
+                    dim=1,
+                    index=seq_features.past_lengths.view(-1, 1),
+                    src=target_ids.view(-1, 1),
+                )
 
             opt.zero_grad()
             input_embeddings = model.module.get_item_embeddings(seq_features.past_ids)
-            seq_embeddings = model(
-                past_lengths=seq_features.past_lengths,
-                past_ids=seq_features.past_ids,
-                past_embeddings=input_embeddings,
-                past_payloads=seq_features.past_payloads,
-            )  # [B, X]
+            if supervision_mode == "all_positions":
+                seq_embeddings = model(
+                    past_lengths=seq_features.past_lengths,
+                    past_ids=seq_features.past_ids,
+                    past_embeddings=input_embeddings,
+                    past_payloads=seq_features.past_payloads,
+                )
 
             supervision_ids = seq_features.past_ids
 
             if sampling_strategy == "in-batch":
                 # get_item_embeddings currently assume 1-d tensor.
                 in_batch_ids = supervision_ids.view(-1)
+                if supervision_mode == "sampled_prefix":
+                    in_batch_ids = torch.cat([in_batch_ids, prefix_targets])
                 negatives_sampler.process_batch(
                     ids=in_batch_ids,
                     presences=(in_batch_ids != 0),
@@ -431,16 +456,29 @@ def train_fn(
             else:
                 negatives_sampler._item_emb = model.module._embedding_module._item_emb
 
-            ar_mask = supervision_ids[:, 1:] != 0
-            loss, aux_losses = ar_loss(
-                lengths=seq_features.past_lengths,  # [B],
-                output_embeddings=seq_embeddings[:, :-1, :],  # [B, N-1, D]
-                supervision_ids=supervision_ids[:, 1:],  # [B, N-1]
-                supervision_embeddings=input_embeddings[:, 1:, :],  # [B, N - 1, D]
-                supervision_weights=ar_mask.float(),
-                negatives_sampler=negatives_sampler,
-                **seq_features.past_payloads,
-            )  # [B, N]
+            if supervision_mode == "sampled_prefix":
+                loss, aux_losses = model(
+                    past_lengths=seq_features.past_lengths,
+                    past_ids=seq_features.past_ids,
+                    past_embeddings=input_embeddings,
+                    past_payloads=seq_features.past_payloads,
+                    sampled_targets=prefix_targets,
+                    negatives_sampler=negatives_sampler,
+                    sampled_loss=ar_loss,
+                )
+                target_exposures += prefix_targets.numel()
+            else:
+                ar_mask = supervision_ids[:, 1:] != 0
+                loss, aux_losses = ar_loss(
+                    lengths=seq_features.past_lengths,
+                    output_embeddings=seq_embeddings[:, :-1, :],
+                    supervision_ids=supervision_ids[:, 1:],
+                    supervision_embeddings=input_embeddings[:, 1:, :],
+                    supervision_weights=ar_mask.float(),
+                    negatives_sampler=negatives_sampler,
+                    **seq_features.past_payloads,
+                )
+                target_exposures += int(ar_mask.sum().item())
             if rank == 0:
                 writer.add_scalar("losses/ar_loss", loss, batch_id)
 
@@ -471,10 +509,17 @@ def train_fn(
                     writer.add_scalar("loss/train", main_loss, batch_id)
                     writer.add_scalar("loss/incl_aux/train", loss, batch_id)
                     for key, value in aux_losses.items():
-                        writer.add_scalar(f"loss/{key}/train", value.float(), batch_id)
+                        diagnostic = (key in {"sparse_active_atoms", "sparse_zero_code_rate",
+                                              "sparse_used_atom_fraction", "expert_gate_entropy"}
+                                      or key.startswith("expert_weight_"))
+                        prefix = "diagnostics" if diagnostic else "loss"
+                        writer.add_scalar(f"{prefix}/{key}/train", value.float(), batch_id)
                     writer.add_scalar("lr", lr, batch_id)
 
             opt.step()
+            project = getattr(model.module._ndp_module, "post_optimizer_step", None)
+            if project is not None:
+                project()
 
             batch_id += 1
             if smoke_steps and batch_id >= smoke_steps:
@@ -570,6 +615,9 @@ def train_fn(
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
                 "metrics": metrics,
+                "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
+                                      "target_exposures": target_exposures, "optimizer_steps": batch_id},
+                "best_hr10": max(best_hr10, metrics["hr@10"]),
             }
             torch.save(state, os.path.join(benchmark_output_dir, "last.pt"))
             is_best = metrics["hr@10"] > best_hr10
@@ -578,6 +626,8 @@ def train_fn(
                 torch.save(state, os.path.join(benchmark_output_dir, "best.pt"))
             with open(os.path.join(benchmark_output_dir, "epochs.jsonl"), "a") as f:
                 f.write(json.dumps({"epoch": epoch, "steps": batch_id, "metrics": metrics,
+                    "supervision_mode": supervision_mode, "target_exposures": target_exposures,
+                    "parameter_count": sum(p.numel() for p in model.parameters()),
                     "best_hr10": is_best, "elapsed_seconds": time.time() - benchmark_started,
                     "peak_memory_bytes": torch.cuda.max_memory_allocated(device)}) + "\n")
         if rank == 0 and not benchmark_output_dir and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
@@ -587,6 +637,8 @@ def train_fn(
                     "batch_id": batch_id,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": opt.state_dict(),
+                    "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
+                                          "target_exposures": target_exposures, "optimizer_steps": batch_id},
                 },
                 f"./ckpts/{model_desc}_ep{epoch}",
             )
@@ -612,6 +664,8 @@ def train_fn(
                 "batch_id": batch_id,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
+                "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
+                                      "target_exposures": target_exposures, "optimizer_steps": batch_id},
             },
             f"./ckpts/{model_desc}_ep{epoch}",
         )

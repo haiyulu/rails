@@ -16,7 +16,7 @@
 # w/ modifications for benchmarking.
 
 import abc
-from typing import Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -117,7 +117,7 @@ class CandidateIndex(object):
         self,
         query_embeddings: torch.Tensor,
         k: int,
-        aux_payloads: Dict[str, torch.Tensor],
+        aux_payloads: Dict[str, Any],
         top_k_module: TopKModule,
         invalid_ids: Optional[torch.Tensor],
         r: int = 1,

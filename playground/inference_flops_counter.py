@@ -25,7 +25,8 @@ class ArithmeticLedger(TorchDispatchMode):
         "empty empty_like empty_strided new_empty new_zeros new_full zeros zeros_like ones ones_like "
         "full full_like fill_ zero_ _to_copy to lift_fresh lift_fresh_copy _local_scalar_dense "
         "pad constant_pad_nd slice_scatter masked_fill masked_fill_ where gt ge lt le eq ne "
-        "clamp clamp_min clamp_max amax amin max min relu relu_ all any isnan isinf isfinite "
+        "clamp clamp_min clamp_max amax amin max min maximum minimum relu relu_ all any isnan isinf isfinite "
+        "sort argsort topk masked_select "
         "bitwise_not logical_not arange resolve_conj resolve_neg _assert_async _assert_scalar "
         "_reshape_alias narrow expand_as view_as resize_ _pin_memory is_pinned contiguous flatten unflatten".split())
 
@@ -47,6 +48,13 @@ class ArithmeticLedger(TorchDispatchMode):
         floating = any(x.is_floating_point() for x in ins + outs)
         matrix = other = 0
         special = Counter()
+        non_arithmetic = Counter()
+        if short in ("sort", "argsort", "topk", "amax", "amin", "max", "min"):
+            non_arithmetic["selection_input_elements"] = ins[0].numel() if ins else 0
+        elif short in ("gather", "index", "index_select", "scatter", "scatter_", "scatter_add_"):
+            non_arithmetic["indexing_output_elements"] = sum(t.numel() for t in outs)
+        elif short in ("gt", "ge", "lt", "le", "eq", "ne", "maximum", "minimum"):
+            non_arithmetic["comparison_output_elements"] = sum(t.numel() for t in outs)
         if not floating:
             rule = "integer/boolean/administrative: no floating arithmetic"
         elif short == "dropout":
@@ -66,12 +74,23 @@ class ArithmeticLedger(TorchDispatchMode):
             rule = "matmul: 2 MAC FLOPs per contraction"
         elif short == "einsum":
             left, right = args[0].replace(" ", "").split("->")
+            terms = left.split(",")
+            ellipsis_rank = max((t.ndim - len(term.replace("...", ""))
+                                 if "..." in term else 0)
+                                for term, t in zip(terms, args[1]))
+            labels = "".join(c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if c not in left + right)[:ellipsis_rank]
+            assert len(labels) == ellipsis_rank
+            expanded = []
+            for term, tensor in zip(terms, args[1]):
+                rank = tensor.ndim - len(term.replace("...", "")) if "..." in term else 0
+                expanded.append(term.replace("...", labels[-rank:] if rank else ""))
+            right = right.replace("...", labels)
             sizes = {}
-            for letters, tensor in zip(left.split(","), args[1]):
+            for letters, tensor in zip(expanded, args[1]):
                 assert len(letters) == tensor.ndim
                 for letter, size in zip(letters, tensor.shape):
-                    assert letter not in sizes or sizes[letter] == size
-                    sizes[letter] = size
+                    assert letter not in sizes or sizes[letter] == size or sizes[letter] == 1 or size == 1
+                    sizes[letter] = max(sizes.get(letter, 1), size)
             contracted = [size for letter, size in sizes.items() if letter not in right]
             assert contracted, "Only contraction einsums are defined"
             matrix = 2 * out.numel() * prod(contracted)
@@ -135,7 +154,7 @@ class ArithmeticLedger(TorchDispatchMode):
             if short == "mean":
                 other += out.numel()
             rule = "reduction additions; mean also divides each output"
-        elif short == "pow" and not isinstance(args[1], torch.Tensor) and args[1] == 2:
+        elif short == "square" or (short == "pow" and not isinstance(args[1], torch.Tensor) and args[1] == 2):
             other = out.numel()
             rule = "square: one multiply per element"
         else:
@@ -147,29 +166,35 @@ class ArithmeticLedger(TorchDispatchMode):
             self.rows[key] = {"bucket": self.bucket, "module": module, "operator": str(func),
                 "inputs": shape_description(args), "outputs": shape_description(output),
                 "rule": rule, "calls": 0, "matrix_flops": 0, "other_arithmetic_flops": 0,
-                "special_functions": {}}
+                "special_functions": {}, "non_arithmetic_operations": {}}
         row = self.rows[key]
         row["calls"] += 1
         row["matrix_flops"] += int(matrix)
         row["other_arithmetic_flops"] += int(other)
         row["special_functions"] = dict(Counter(row["special_functions"]) + special)
+        row["non_arithmetic_operations"] = dict(Counter(row["non_arithmetic_operations"]) + non_arithmetic)
         return output
 
     def totals(self):
         special = Counter()
+        non_arithmetic = Counter()
         matrix = other = 0
         for row in self.rows.values():
             matrix += row["matrix_flops"]
             other += row["other_arithmetic_flops"]
             special.update(row["special_functions"])
+            non_arithmetic.update(row["non_arithmetic_operations"])
         return {"matrix_flops": matrix, "other_arithmetic_flops": other,
-                "arithmetic_flops": matrix + other, "special_functions": dict(special)}
+                "arithmetic_flops": matrix + other, "special_functions": dict(special),
+                "non_arithmetic_operations": dict(non_arithmetic)}
 
 
 def sum_totals(*values):
     special = Counter()
+    non_arithmetic = Counter()
     for value in values:
         special.update(value["special_functions"])
+        non_arithmetic.update(value.get("non_arithmetic_operations", {}))
     return {key: sum(value[key] for value in values) for key in
             ("matrix_flops", "other_arithmetic_flops", "arithmetic_flops")} | {
-                "special_functions": dict(special)}
+                "special_functions": dict(special), "non_arithmetic_operations": dict(non_arithmetic)}

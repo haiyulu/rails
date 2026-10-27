@@ -59,7 +59,7 @@ Use eight unrolled projected-gradient steps initially, starting at zero:
 \right].
 \]
 
-Use a stable step size, initially `eta_e = 0.9 / (norm(C_e, 2)**2 + eps)`, refreshed with dictionary weights as model-only preparation. The finite-step result is approximate. Retain at most `K_act` largest positive coefficients after inference, giving `gamma_tilde` and support `A(i,e)`. This hard support cap bounds scorer work.
+Use the conservative stable step size `eta_e = 0.9 / max(norm(C_e, 'fro')**2, eps)`, refreshed with dictionary weights as model-only preparation. The Frobenius-squared norm upper-bounds the spectral Lipschitz constant and has directly auditable arithmetic costs. The finite-step result is approximate. Retain at most `K_act` largest positive coefficients after inference, giving `gamma_tilde` and support `A(i,e)`. This hard support cap bounds scorer work.
 
 Normalize retained coefficients to obtain continuous summary weights:
 
@@ -271,7 +271,7 @@ Use strict loading for new-model checkpoints and preserve existing baseline chec
 
 Create `configs/ml-1m/sasrec-expert-history.gin` and `configs/ml-1m/hstu-expert-history.gin`. Start from the corresponding backbone settings and dataset protocol; set the new factory, retrieval method, prefix supervision, sparse-coding controls, expert gates, and sparse-coding loss weights explicitly.
 
-Planned Gin wiring, once the named controls are implemented:
+Gin wiring:
 
 ~~~gin
 train_fn.interaction_module_type = "ExpertHistory"

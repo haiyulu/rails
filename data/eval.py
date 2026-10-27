@@ -116,12 +116,18 @@ def eval_metrics_v2_from_tensors(
 
     start_time = time.time()
     # computes ro- part exactly once.
-    shared_input_embeddings = model.encode(
+    encoder = (model.encode_with_history if getattr(model._ndp_module, "requires_user_memory", False)
+               else model.encode)
+    prepared = encoder(
         past_lengths=seq_features.past_lengths,
         past_ids=seq_features.past_ids,
         past_embeddings=model.get_item_embeddings(seq_features.past_ids),
         past_payloads=seq_features.past_payloads,
     )
+    if getattr(model._ndp_module, "requires_user_memory", False):
+        shared_input_embeddings, user_memory = prepared
+    else:
+        shared_input_embeddings, user_memory = prepared, None
     if dtype is not None:
         shared_input_embeddings = shared_input_embeddings.to(dtype)
 
@@ -136,6 +142,12 @@ def eval_metrics_v2_from_tensors(
     eval_top_k_prs_all = []
     eval_time_all = []
     for mb in range(num_batches):
+        begin, end = mb * user_max_batch_size, (mb + 1) * user_max_batch_size
+        batch_payloads = {key: value[begin:end] if isinstance(value, torch.Tensor)
+                          and value.ndim > 0 and value.shape[0] == B else value
+                          for key, value in seq_features.past_payloads.items()}
+        if user_memory is not None:
+            batch_payloads["user_memory"] = user_memory.index_batch(slice(begin, end))
         # Eval runtime for 10% of the batches
         if include_eval_time and (random.random()) < 0.1:
             warm_up_runs = 3  # warm up runs
@@ -145,7 +157,7 @@ def eval_metrics_v2_from_tensors(
                     query_embeddings=shared_input_embeddings[mb * user_max_batch_size: (mb + 1) * user_max_batch_size, ...],
                     top_k_module=eval_state.top_k_module,
                     k=k,
-                    aux_payloads=seq_features.past_payloads,
+                    aux_payloads=batch_payloads,
                     invalid_ids=seq_features.past_ids[
                         mb * user_max_batch_size: (mb + 1) * user_max_batch_size, :
                     ] if filter_invalid_ids else None,
@@ -159,7 +171,7 @@ def eval_metrics_v2_from_tensors(
                     query_embeddings=shared_input_embeddings[mb * user_max_batch_size: (mb + 1) * user_max_batch_size, ...],
                     top_k_module=eval_state.top_k_module,
                     k=k,
-                    aux_payloads=seq_features.past_payloads,
+                    aux_payloads=batch_payloads,
                     invalid_ids=seq_features.past_ids[
                         mb * user_max_batch_size: (mb + 1) * user_max_batch_size, :
                     ] if filter_invalid_ids else None,
@@ -173,7 +185,7 @@ def eval_metrics_v2_from_tensors(
             query_embeddings=shared_input_embeddings[mb * user_max_batch_size: (mb + 1) * user_max_batch_size, ...],
             top_k_module=eval_state.top_k_module,
             k=k,
-            aux_payloads=seq_features.past_payloads,
+            aux_payloads=batch_payloads,
             invalid_ids=seq_features.past_ids[
                 mb * user_max_batch_size: (mb + 1) * user_max_batch_size, :
             ] if filter_invalid_ids else None,

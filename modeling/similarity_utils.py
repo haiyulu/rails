@@ -25,6 +25,7 @@ import gin
 import torch
 
 from rails.similarities.dot_product_similarity_fn import DotProductSimilarity
+from rails.similarities.expert_history import ExpertHistorySimilarity
 from rails.similarities.layers import GeGLU, SwiGLU
 from rails.similarities.mol.similarity_fn import MoLSimilarity, SoftmaxDropoutCombiner
 from rails.similarities.mol.query_embeddings_fns import RecoMoLQueryEmbeddingsFn
@@ -246,6 +247,36 @@ def create_mol_interaction_module(
 
 
 @gin.configurable
+def create_expert_history_interaction_module(
+    query_embedding_dim: int,
+    item_embedding_dim: int,
+    num_item_experts: int = 2,
+    dictionary_size: int = 32,
+    max_active_latents: int = 2,
+    events_per_slot: int = 16,
+    sparse_coding_steps: int = 8,
+    sparse_l1_weight: float = 0.01,
+    attention_dim: int = 32,
+    value_dim: int = 32,
+    hidden_dim: int = 64,
+    attention_heads_per_expert: int = 1,
+    use_tail_summaries: bool = True,
+    share_expert_memory: bool = False,
+    activation_weighting: str = "coefficient",
+) -> Tuple[ExpertHistorySimilarity, str]:
+    module = ExpertHistorySimilarity(
+        query_embedding_dim, item_embedding_dim, num_item_experts, dictionary_size,
+        max_active_latents, events_per_slot, sparse_coding_steps, sparse_l1_weight,
+        attention_dim, value_dim, hidden_dim, attention_heads_per_expert,
+        use_tail_summaries, share_expert_memory, activation_weighting=activation_weighting)
+    description = (f"ExpertHistory-e{num_item_experts}-m{dictionary_size}-k{max_active_latents}"
+                   f"-b{events_per_slot}-steps{sparse_coding_steps}-l1{sparse_l1_weight}"
+                   f"-q{attention_dim}-v{value_dim}-h{hidden_dim}-heads{attention_heads_per_expert}"
+                   f"-tail{int(use_tail_summaries)}-shared{int(share_expert_memory)}-{activation_weighting}")
+    return module, description
+
+
+@gin.configurable
 def get_similarity_function(
     module_type: str,
     query_embedding_dim: int,
@@ -264,6 +295,9 @@ def get_similarity_function(
                 bf16_training=bf16_training,
             )
         )
+    elif module_type == "ExpertHistory":
+        interaction_module, interaction_module_debug_str = create_expert_history_interaction_module(
+            query_embedding_dim=query_embedding_dim, item_embedding_dim=item_embedding_dim)
     else:
         raise ValueError(f"Unknown interaction_module_type {module_type}")
     return interaction_module, interaction_module_debug_str
