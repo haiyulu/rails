@@ -1,0 +1,13 @@
+{
+  "reference_run": "20261026-201101",
+  "comparison": [
+    {
+      "epoch": 0,
+      "max_metric_difference": 0.0
+    },
+    {
+      "epoch": 1,
+      "max_metric_difference": 0.0
+    }
+  ]
+}

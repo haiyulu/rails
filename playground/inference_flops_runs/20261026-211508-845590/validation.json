@@ -1,0 +1,76 @@
+[
+  {
+    "model": "sasrec",
+    "B": 1,
+    "L": 200,
+    "T": 211,
+    "N": 3883,
+    "max_absolute_score_error": 0.0,
+    "boundary_calls": {
+      "U": {
+        "history.encode": 1,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 0,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 0,
+        "_ndp_module._gating_fn._query_only_partial_module": 0,
+        "_ndp_module._gating_fn._item_only_partial_module": 0
+      },
+      "I": {
+        "history.encode": 0,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 0,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 0,
+        "_ndp_module._gating_fn._query_only_partial_module": 0,
+        "_ndp_module._gating_fn._item_only_partial_module": 0
+      },
+      "S": {
+        "history.encode": 0,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 0,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 0,
+        "_ndp_module._gating_fn._query_only_partial_module": 0,
+        "_ndp_module._gating_fn._item_only_partial_module": 0
+      }
+    },
+    "reconciliation": "exact",
+    "profiler_matrix_crosscheck": {
+      "U": 30468400,
+      "I": 0,
+      "S": 388300
+    }
+  },
+  {
+    "model": "sasrec_mol",
+    "B": 1,
+    "L": 200,
+    "T": 211,
+    "N": 3883,
+    "max_absolute_score_error": 0.0,
+    "boundary_calls": {
+      "U": {
+        "history.encode": 1,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 1,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 0,
+        "_ndp_module._gating_fn._query_only_partial_module": 1,
+        "_ndp_module._gating_fn._item_only_partial_module": 0
+      },
+      "I": {
+        "history.encode": 0,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 0,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 1,
+        "_ndp_module._gating_fn._query_only_partial_module": 0,
+        "_ndp_module._gating_fn._item_only_partial_module": 1
+      },
+      "S": {
+        "history.encode": 0,
+        "_ndp_module._query_embeddings_fn._query_emb_proj_module": 0,
+        "_ndp_module._item_embeddings_fn._item_emb_proj_module": 0,
+        "_ndp_module._gating_fn._query_only_partial_module": 0,
+        "_ndp_module._gating_fn._item_only_partial_module": 0
+      }
+    },
+    "reconciliation": "exact",
+    "profiler_matrix_crosscheck": {
+      "U": 31050544,
+      "I": 180916736,
+      "S": 79523840
+    }
+  }
+]

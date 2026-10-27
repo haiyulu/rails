@@ -1,0 +1,60 @@
+# FLOP coverage
+
+All observed floating-point operators were explicitly classified. An unknown floating operator aborts the run. Matrix counts matched PyTorch FlopCounterMode in every case. PyTorch omits bias/elementwise arithmetic and special functions from its matrix count; these are included in the separate ledger. Custom jagged conversions are classified as data movement. LayerNorm, L2 norm, softmax and SiLU use the plan's canonical decompositions.
+
+Observed operators:
+
+- `aten.abs.default`
+- `aten.add.Tensor`
+- `aten.alias.default`
+- `aten.arange.default`
+- `aten.arange.start_step`
+- `aten.baddbmm.default`
+- `aten.bmm.default`
+- `aten.cat.default`
+- `aten.clamp.default`
+- `aten.contiguous.default`
+- `aten.conv1d.default`
+- `aten.detach.default`
+- `aten.div.Tensor`
+- `aten.dropout.default`
+- `aten.einsum.default`
+- `aten.embedding.default`
+- `aten.index.Tensor`
+- `aten.index_select.default`
+- `aten.layer_norm.default`
+- `aten.linalg_norm.default`
+- `aten.linear.default`
+- `aten.log.default`
+- `aten.masked_fill_.Scalar`
+- `aten.matmul.default`
+- `aten.mean.dim`
+- `aten.mm.default`
+- `aten.mul.Tensor`
+- `aten.mul_.Tensor`
+- `aten.ne.Scalar`
+- `aten.numpy_T.default`
+- `aten.pad.default`
+- `aten.relu.default`
+- `aten.remainder.Scalar`
+- `aten.repeat.default`
+- `aten.reshape.default`
+- `aten.rsub.Scalar`
+- `aten.select.int`
+- `aten.sigmoid.default`
+- `aten.silu.default`
+- `aten.slice.Tensor`
+- `aten.softmax.int`
+- `aten.split_with_sizes.default`
+- `aten.squeeze.dim`
+- `aten.sub.Tensor`
+- `aten.sum.dim_IntList`
+- `aten.to.dtype`
+- `aten.transpose.int`
+- `aten.unflatten.int`
+- `aten.unsqueeze.default`
+- `aten.view.default`
+- `aten.zeros_like.default`
+- `fbgemm.asynchronous_complete_cumsum.default`
+- `fbgemm.dense_to_jagged.default`
+- `fbgemm.jagged_to_padded_dense.default`

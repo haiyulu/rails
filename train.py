@@ -20,6 +20,7 @@ Main entry point for model training. Please refer to README.md for usage instruc
 """
 
 import logging
+import json
 import os
 import random
 
@@ -146,8 +147,12 @@ def train_fn(
     l2_norm_eps: float = 1e-6,
     enable_tf32: bool = False,
     random_seed: int = 42,
+    benchmark_output_dir: str = "",
+    smoke_steps: int = 0,
 ) -> None:
     # to enable more deterministic results.
+    if benchmark_output_dir and world_size != 1:
+        raise ValueError("Benchmark checkpoint/metric recording requires a single GPU")
     random.seed(random_seed)
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
@@ -337,6 +342,13 @@ def train_fn(
     # torch.autograd.set_detect_anomaly(True)
 
     batch_id = 0
+    benchmark_started = time.time()
+    best_hr10 = float("-inf")
+    if benchmark_output_dir:
+        os.makedirs(benchmark_output_dir, exist_ok=True)
+        with open(os.path.join(benchmark_output_dir, "operative_config.gin"), "w") as f:
+            f.write(gin.operative_config_str())
+    torch.cuda.reset_peak_memory_stats(device)
     while epoch < num_epochs:
         if train_data_sampler is not None:
             train_data_sampler.set_epoch(epoch)
@@ -350,7 +362,7 @@ def train_fn(
                 max_output_length=gr_output_length + 1,
             )
 
-            if (batch_id % eval_interval) == 0:
+            if not smoke_steps and (batch_id % eval_interval) == 0:
                 model.eval()
 
                 eval_state = get_eval_state(
@@ -435,6 +447,10 @@ def train_fn(
             main_loss = loss.detach().clone()
             loss = get_weighted_loss(loss, aux_losses, weights=loss_weights)
             loss.backward()
+            if smoke_steps:
+                assert torch.isfinite(loss).all(), "Non-finite smoke loss"
+                gradients = [p.grad for p in model.parameters() if p.grad is not None]
+                assert gradients and all(torch.isfinite(g).all() for g in gradients), "Non-finite smoke gradients"
 
             # Optional linear warmup.
             if batch_id < num_warmup_steps:
@@ -461,6 +477,17 @@ def train_fn(
             opt.step()
 
             batch_id += 1
+            if smoke_steps and batch_id >= smoke_steps:
+                smoke_result = {"steps": batch_id, "loss": loss.item(),
+                    "finite_gradients": True, "peak_memory_bytes": torch.cuda.max_memory_allocated(device)}
+                print("SMOKE_OK " + json.dumps(smoke_result), flush=True)
+                if benchmark_output_dir:
+                    with open(os.path.join(benchmark_output_dir, "smoke.json"), "w") as f:
+                        json.dump(smoke_result, f, indent=2)
+                if writer is not None:
+                    writer.close()
+                cleanup()
+                return
 
         def is_full_eval(epoch: int) -> bool:
             return (epoch % full_eval_every_n) == 0
@@ -535,7 +562,25 @@ def train_fn(
                 prefix="eval_epoch_full",
                 world_size=world_size,
             )
-        if rank == 0 and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
+        if rank == 0 and benchmark_output_dir:
+            metrics = {k: float(_avg(v, world_size=world_size)) for k, v in eval_dict_all.items()}
+            state = {
+                "epoch": epoch,
+                "batch_id": batch_id,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": opt.state_dict(),
+                "metrics": metrics,
+            }
+            torch.save(state, os.path.join(benchmark_output_dir, "last.pt"))
+            is_best = metrics["hr@10"] > best_hr10
+            if is_best:
+                best_hr10 = metrics["hr@10"]
+                torch.save(state, os.path.join(benchmark_output_dir, "best.pt"))
+            with open(os.path.join(benchmark_output_dir, "epochs.jsonl"), "a") as f:
+                f.write(json.dumps({"epoch": epoch, "steps": batch_id, "metrics": metrics,
+                    "best_hr10": is_best, "elapsed_seconds": time.time() - benchmark_started,
+                    "peak_memory_bytes": torch.cuda.max_memory_allocated(device)}) + "\n")
+        if rank == 0 and not benchmark_output_dir and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
             torch.save(
                 {
                     "epoch": epoch,
@@ -558,6 +603,9 @@ def train_fn(
             writer.flush()
             writer.close()
 
+        if benchmark_output_dir:
+            cleanup()
+            return
         torch.save(
             {
                 "epoch": epoch,
@@ -578,6 +626,7 @@ def mp_train_fn(
     gin_config_file: Optional[str],
     restore_from_ckpt: str,
 ) -> None:
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
     if gin_config_file is not None:
         # Hack as absl doesn't support flag parsing inside multiprocessing.
         logging.info(f"Rank {rank}: loading gin config from {gin_config_file}")

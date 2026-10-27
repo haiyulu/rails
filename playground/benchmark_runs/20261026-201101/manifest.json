@@ -1,0 +1,134 @@
+{
+  "run_id": "20261026-201101",
+  "status": "failed",
+  "seed": 42,
+  "commands": [
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "playground/validate_ml1m_benchmark.py"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/validation.log",
+      "started": 1793070661.354834,
+      "returncode": 0,
+      "duration_seconds": 7.58821177482605
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/sasrec/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/sasrec_smoke.log",
+      "started": 1793070668.9435024,
+      "returncode": 0,
+      "duration_seconds": 33.408286809921265
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/sasrec_mol/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/sasrec_mol_smoke.log",
+      "started": 1793070702.3528283,
+      "returncode": 0,
+      "duration_seconds": 47.89327120780945
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/hstu/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/hstu_smoke.log",
+      "started": 1793070750.2466,
+      "returncode": 0,
+      "duration_seconds": 32.67643094062805
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/hstu_mol/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/hstu_mol_smoke.log",
+      "started": 1793070782.9234805,
+      "returncode": 0,
+      "duration_seconds": 38.552258014678955
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/pretrained_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/ckpts/ml-1m-l200/HSTU-b8-h2-dqk25-dv25-lsilud0.2-ad0.0_MoL-8x4x64-t0.05-d0.2-l2-q512d0.0swiglu-id0.1-gq128-gi128d0.0-gqi128d0.0-x-glu_silu-uids6040d0.5_local_ssl-n128-lwuid_embedding_l2_norm:0.1-mi_loss:0.001-b128-lr0.001-wu0-wd0.001-2024-11-06_ep72",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/pretrained_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/pretrained_metrics.log",
+      "started": 1793070821.4763331,
+      "returncode": 0,
+      "duration_seconds": 36.49265718460083
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/sasrec/sasrec-sampled-softmax-n128-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/sasrec_train.log",
+      "started": 1793070857.9694216,
+      "returncode": -15,
+      "duration_seconds": 128.863520860672
+    }
+  ],
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "revision": "90a12a4c920fb73e380950b281e80d6f2ad9e52c",
+  "gpu": "Mon Oct 26 20:11:01 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 595.112.07             Driver Version: 595.112.07     CUDA Version: 13.2     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 5090        Off |   00000000:01:00.0 Off |                  N/A |\n|  0%   34C    P8             15W /  600W |     875MiB /  32607MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A            1828      G   /usr/lib/xorg/Xorg                      504MiB |\n|    0   N/A  N/A            2124      G   /usr/bin/gnome-shell                     14MiB |\n|    0   N/A  N/A            4550      G   ...rack-uuid=3190708988185955192         97MiB |\n|    0   N/A  N/A           12101      G   ...rack-uuid=3190708988185955192        186MiB |\n+-----------------------------------------------------------------------------------------+\n",
+  "data_sha256": {
+    "tmp/ml-1m/sasrec_format.csv": "2582a9946b0fa5b96e393f03cb0cd5f22e8977d93ccef99aff2b3e06863912de",
+    "tmp/processed/ml-1m/movies.csv": "efdbb1859c29c6699bc544e0e27b6d69c452216268b1dd41eaaef7a755e3349e"
+  },
+  "deviations": [
+    "Modern uv environment for RTX 5090; original model/optimizer settings retained.",
+    "Single seed; no independent validation split; final and best evaluation epoch reported separately.",
+    "Checkpoint evaluator extended to support SASRec and export full metrics."
+  ],
+  "pretrained_sanity": {
+    "epoch": 72,
+    "metrics": {
+      "ndcg@1": 0.08741721510887146,
+      "ndcg@5": 0.16601979732513428,
+      "ndcg@10": 0.19990141689777374,
+      "ndcg@50": 0.25604483485221863,
+      "ndcg@100": 0.27258530259132385,
+      "ndcg@200": 0.2848159968852997,
+      "hr@1": 0.08741721510887146,
+      "hr@5": 0.24221853911876678,
+      "hr@10": 0.34735098481178284,
+      "hr@50": 0.6023178696632385,
+      "hr@100": 0.7041390538215637,
+      "hr@200": 0.7913907170295715,
+      "hr@500": 0.8879138827323914,
+      "hr@1000": 0.9427152276039124,
+      "mrr": 0.16940496861934662,
+      "ndcg@10_>=4": 0.18942417204380035,
+      "hr@10_>=4": 0.3315492868423462,
+      "hr@50_>=4": 0.5878873467445374,
+      "mrr_>=4": 0.1607307642698288
+    }
+  },
+  "active_model": "sasrec",
+  "error": "RuntimeError(\"Command failed (-15): /home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/logs/sasrec_train.log\\nINFO:root:Rank 0: loading gin config from /home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/sasrec/sasrec-sampled-softmax-n128-final.gin\\n/home/hylu/hylucode/research/rails/.venv/lib/python3.12/site-packages/torch/backends/__init__.py:46: UserWarning: Please use the new API settings to control TF32 behavior, such as torch.backends.cudnn.conv.fp32_precision = 'tf32' or torch.backends.cuda.matmul.fp32_precision = 'ieee'. Old settings, e.g, torch.backends.cuda.matmul.allow_tf32 = True, torch.backends.cudnn.allow_tf32 = True, allowTF32CuDNN() and allowTF32CuBLAS() will be deprecated after Pytorch 2.9. Please see https://pytorch.org/docs/main/notes/cuda.html#tensorfloat-32-tf32-on-ampere-and-later-devices (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:80.)\\n  self.setter(val)\\nINFO:root:cuda.matmul.allow_tf32: True\\nINFO:root:cudnn.allow_tf32: True\\nINFO:root:Training model on rank 0.\\nInitialize _item_emb.weight as truncated normal: torch.Size([3953, 50]) params\\nSkipping initialization for _embedding_module._item_emb.weight\\nSkipping initialization for _input_features_preproc._pos_emb.weight\\nInitialize attention_layers.0.in_proj_weight as xavier normal: torch.Size([150, 50]) params\\nFailed to initialize attention_layers.0.in_proj_bias: torch.Size([150]) params\\nInitialize attention_layers.0.out_proj.weight as xavier normal: torch.Size([50, 50]) params\\nFailed to initialize attention_layers.0.out_proj.bias: torch.Size([50]) params\\nInitialize attention_layers.1.in_proj_weight as xavier normal: torch.Size([150, 50]) params\\nFailed to initialize attention_layers.1.in_proj_bias: torch.Size([150]) params\\nInitialize attention_layers.1.out_proj.weight as xavier normal: torch.Size([50, 50]) params\\nFailed to initialize attention_layers.1.out_proj.bias: torch.Size([50]) params\\nInitialize forward_layers.0._conv1d.0.weight as xavier normal: torch.Size([50, 50, 1]) params\\nFailed to initialize forward_layers.0._conv1d.0.bias: torch.Size([50]) params\\nInitialize forward_layers.0._conv1d.3.weight as xavier normal: torch.Size([50, 50, 1]) params\\nFailed to initialize forward_layers.0._conv1d.3.bias: torch.Size([50]) params\\nInitialize forward_layers.1._conv1d.0.weight as xavier normal: torch.Size([50, 50, 1]) params\\nFailed to initialize forward_layers.1._conv1d.0.bias: torch.Size([50]) params\\nInitialize forward_layers.1._conv1d.3.weight as xavier normal: torch.Size([50, 50, 1]) params\\nFailed to initialize forward_layers.1._conv1d.3.bias: torch.Size([50]) params\\nINFO:root:Rank 0: writing logs to ./exps/ml-1m-l200/SASRec-d50-b2-h1-posi_d0.2-l2-ffn50-relu-d0.2_DotProduct_local-l2-eps1e-06_ssl-t0.05-n128-b128-lr0.001-wu0-wd0-benchmark-20261026-201101\\nINFO:root:rank 0:  batch-stat (eval): iter 0 (epoch 0): NDCG@10 0.0000, HR@10 0.0000, HR@50 0.0078, MRR 0.0016 \\n/home/hylu/hylucode/research/rails/.venv/lib/python3.12/site-packages/torch/autograd/graph.py:841: UserWarning: fbgemm::dense_to_jagged: an autograd kernel was not registered to the Autograd key(s) but we are trying to backprop through it. This may lead to silently incorrect behavior. This behavior is deprecated and will be removed in a future version of PyTorch. If your operator is differentiable, please ensure you have registered an autograd kernel to the correct Autograd key (e.g. DispatchKey::Autograd, DispatchKey::CompositeImplicitAutograd). If your operator is not differentiable, or to squash this warning and use the previous behavior, please register torch::CppFunction::makeFallthrough() to DispatchKey::Autograd. (Triggered internally at /pytorch/torch/csrc/autograd/autograd_not_implemented_fallback.cpp:62.)\\n  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass\\nINFO:root: rank: 0, batch-stat (train): step 0 (epoch 0 in 22.79s): 8.364967\\nINFO:root:rank 0: eval @ epoch 0 in 24.06s: NDCG@10 0.0177, NDCG@50 0.0362, HR@10 0.0363, HR@50 0.1227, MRR 0.0188\\nINFO:root:rank 0: eval @ epoch 1 in 24.04s: NDCG@10 0.0172, NDCG@50 0.0372, HR@10 0.0366, HR@50 0.1288, MRR 0.0186\\nINFO:root:rank 0:  batch-stat (eval): iter 100 (epoch 2): NDCG@10 0.0286, HR@10 0.0625, HR@50 0.1797, MRR 0.0266 \\nINFO:root: rank: 0, batch-stat (train): step 100 (epoch 2 in 22.28s): 4.152957\\n/home/hylu/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 11 leaked semaphore objects to clean up at shutdown\\n  warnings.warn('resource_tracker: There appear to be %d '\\n\")"
+}

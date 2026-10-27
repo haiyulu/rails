@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 612 792">
+  <!-- Generator: Adobe Illustrator 29.8.11, SVG Export Plug-In . SVG Version: 2.1.1 Build 11)  -->
+  <defs>
+    <style>
+      .st0, .st1, .st2, .st3, .st4, .st5, .st6, .st7, .st8, .st9, .st10, .st11, .st12, .st13, .st14, .st15, .st16, .st17, .st18, .st19, .st20, .st21, .st22, .st23, .st24, .st25, .st26, .st27, .st28 {
+        isolation: isolate;
+      }
+
+      .st0, .st1, .st2, .st3, .st7, .st10, .st11, .st12, .st14, .st15, .st16, .st19, .st20, .st22, .st24, .st25, .st26, .st27, .st28 {
+        font-family: Arial-BoldMT, Arial;
+        font-weight: 700;
+      }
+
+      .st0, .st11, .st12, .st25, .st27 {
+        fill: #1e6b2e;
+      }
+
+      .st0, .st20, .st26 {
+        font-size: 8.12px;
+      }
+
+      .st29, .st30 {
+        fill: #1877f2;
+      }
+
+      .st31, .st1, .st32, .st4, .st5, .st10, .st33, .st34, .st35 {
+        fill: #fff;
+      }
+
+      .st31, .st36, .st32, .st37, .st38, .st39, .st40, .st41, .st30, .st42, .st43, .st33, .st44, .st45, .st34, .st46, .st35 {
+        stroke-width: .5px;
+      }
+
+      .st31, .st38, .st41, .st43 {
+        stroke: #e8790c;
+      }
+
+      .st47 {
+        fill: #f4f5f7;
+      }
+
+      .st1, .st3, .st27 {
+        font-size: 10px;
+      }
+
+      .st36, .st32, .st37, .st39 {
+        stroke: #8b4dd3;
+      }
+
+      .st36, .st48, .st49, .st50, .st51, .st52 {
+        fill: #8b4dd3;
+      }
+
+      .st37, .st41, .st45, .st46 {
+        fill: none;
+      }
+
+      .st38 {
+        fill: #fff4e8;
+      }
+
+      .st53 {
+        fill: #4a8ff0;
+      }
+
+      .st39 {
+        fill: #f2ebfb;
+      }
+
+      .st2, .st54, .st10, .st13, .st22 {
+        font-size: 7.18px;
+      }
+
+      .st2, .st16, .st24 {
+        fill: #9a4a00;
+      }
+
+      .st3, .st14, .st26 {
+        fill: #5e2da0;
+      }
+
+      .st55 {
+        fill-opacity: .45;
+      }
+
+      .st55, .st56, .st57, .st58, .st59, .st60, .st61, .st62, .st43 {
+        fill: #e8790c;
+      }
+
+      .st56 {
+        fill-opacity: .61;
+      }
+
+      .st57 {
+        fill-opacity: .53;
+      }
+
+      .st58 {
+        fill-opacity: .69;
+      }
+
+      .st59 {
+        fill-opacity: .85;
+      }
+
+      .st60 {
+        fill-opacity: .77;
+      }
+
+      .st61 {
+        fill-opacity: .93;
+      }
+
+      .st63 {
+        letter-spacing: 0em;
+      }
+
+      .st63, .st64 {
+        font-family: KozGoPr6N-Regular-83pv-RKSJ-H, 'Kozuka Gothic Pr6N';
+      }
+
+      .st4, .st65, .st7, .st18, .st21 {
+        font-size: 7.81px;
+      }
+
+      .st4, .st5, .st6, .st8, .st9, .st66, .st13, .st17, .st18, .st67, .st23 {
+        font-family: ArialMT, Arial;
+      }
+
+      .st5, .st17 {
+        font-size: 6.87px;
+      }
+
+      .st6, .st8, .st9, .st13, .st17, .st18, .st21, .st23, .st28 {
+        fill: #5b5f66;
+      }
+
+      .st7, .st15, .st19, .st20, .st22 {
+        fill: #0b4fb3;
+      }
+
+      .st68 {
+        fill: #5cc2b7;
+      }
+
+      .st8 {
+        font-size: 11.24px;
+      }
+
+      .st40 {
+        fill: #1c2b4a;
+        stroke: #fff;
+      }
+
+      .st9 {
+        font-size: 9.06px;
+      }
+
+      .st66 {
+        letter-spacing: 0em;
+      }
+
+      .st11, .st15, .st23 {
+        font-size: 7.5px;
+      }
+
+      .st12 {
+        font-size: 9.68px;
+      }
+
+      .st30, .st42, .st33, .st46 {
+        stroke: #1877f2;
+      }
+
+      .st69 {
+        fill: #2e9e44;
+      }
+
+      .st70, .st71, .st72 {
+        fill: #f5a04a;
+      }
+
+      .st14, .st28 {
+        font-size: 8.75px;
+      }
+
+      .st42 {
+        fill: #eef4ff;
+      }
+
+      .st16, .st19, .st25 {
+        font-size: 12.49px;
+      }
+
+      .st71 {
+        fill-opacity: .64;
+      }
+
+      .st72 {
+        fill-opacity: .82;
+      }
+
+      .st44 {
+        fill: #eef8f0;
+      }
+
+      .st44, .st45, .st34, .st35 {
+        stroke: #2e9e44;
+      }
+
+      .st48 {
+        fill-opacity: .6;
+      }
+
+      .st49 {
+        fill-opacity: .9;
+      }
+
+      .st50 {
+        fill-opacity: .8;
+      }
+
+      .st51 {
+        fill-opacity: .7;
+      }
+
+      .st34 {
+        stroke-dasharray: 4 4;
+      }
+
+      .st24 {
+        font-size: 8.43px;
+      }
+    </style>
+  </defs>
+  <rect class="st47" x="13.5" y="12.97" width="587.21" height="474.86" rx="16" ry="16"/>
+  <path class="st35" d="M215.47,22.12h177.41c6.21,0,11.24,5.03,11.24,11.24h0c0,6.21-5.03,11.24-11.24,11.24h-177.41c-6.21,0-11.24-5.03-11.24-11.24h0c0-6.21,5.03-11.24,11.24-11.24Z"/>
+  <text class="st12" transform="translate(222.37 37.12)"><tspan x="0" y="0">score · near-ranker model accuracy</tspan></text>
+  <rect class="st44" x="38.69" y="59.6" width="555.98" height="151.18" rx="16" ry="16"/>
+  <rect class="st44" x="32.44" y="63.35" width="555.98" height="151.18" rx="16" ry="16"/>
+  <rect class="st44" x="26.19" y="67.1" width="555.98" height="151.18" rx="16" ry="16"/>
+  <text class="st25" transform="translate(36.19 83.97)"><tspan x="0" y="0">Genre 4 Mega-fused GPU kernel</tspan></text>
+  <rect class="st33" x="26.19" y="228.27" width="262.37" height="226.58" rx="16" ry="16"/>
+  <text class="st19" transform="translate(41.08 244.62)"><tspan x="0" y="0">User Mixture-of-Experts</tspan></text>
+  <circle class="st40" cx="28.69" cy="229.52" r="9.37"/>
+  <text class="st1" transform="translate(25.91 233.27)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st31" x="388.51" y="228.27" width="193.66" height="226.51" rx="16" ry="16"/>
+  <text class="st16" transform="translate(402.26 244.62)"><tspan x="0" y="0">Ad Mixture-of-Experts</tspan></text>
+  <rect class="st42" x="73.67" y="254.51" width="212.4" height="137.43" rx="10" ry="10"/>
+  <text class="st20" transform="translate(82.41 266.38)"><tspan x="0" y="0">Expert tower n · generative user representation</tspan></text>
+  <rect class="st42" x="61.17" y="272" width="212.4" height="137.43" rx="10" ry="10"/>
+  <text class="st20" transform="translate(69.92 283.87)"><tspan x="0" y="0">Expert tower 3 · organic + ad joint learning</tspan></text>
+  <rect class="st42" x="48.68" y="289.49" width="212.4" height="137.43" rx="10" ry="10"/>
+  <text class="st20" transform="translate(57.43 301.36)"><tspan x="0" y="0">Expert tower 2 · early start</tspan></text>
+  <rect class="st42" x="36.19" y="306.98" width="212.4" height="137.43" rx="10" ry="10"/>
+  <text class="st20" transform="translate(44.93 321.35)"><tspan x="0" y="0">Expert tower 1 · request only</tspan></text>
+  <text class="st18" transform="translate(179.3 321.35)"><tspan x="0" y="0">10–100 GFLOPs</tspan></text>
+  <path class="st39" d="M53.68,328.85h177.41c4.83,0,8.75,3.92,8.75,8.75h0c0,4.83-3.92,8.75-8.75,8.75H53.68c-4.83,0-8.75-3.92-8.75-8.75h0c0-4.83,3.92-8.75,8.75-8.75Z"/>
+  <text class="st26" transform="translate(74.01 340.72)"><tspan x="0" y="0">ad latent aware user representation</tspan></text>
+  <rect class="st33" x="44.93" y="357.58" width="87.46" height="18.74" rx="6" ry="6"/>
+  <text class="st7" transform="translate(63.71 370.08)"><tspan x="0" y="0">Non-seq blocks</tspan></text>
+  <path class="st46" d="M88.66,356.33v-3.69"/>
+  <polygon class="st29" points="88.66 347.34 91.47 352.96 85.85 352.96 88.66 347.34"/>
+  <rect class="st33" x="139.89" y="357.58" width="99.95" height="18.74" rx="6" ry="6"/>
+  <text class="st7" transform="translate(155.58 370.08)"><tspan x="0" y="0">Sequence blocks</tspan></text>
+  <path class="st46" d="M189.86,356.33v-3.69"/>
+  <polygon class="st29" points="189.86 347.34 192.67 352.96 187.05 352.96 189.86 347.34"/>
+  <rect class="st53" x="46.18" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st68" x="143.01" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="58.05" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="154.88" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="69.92" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st68" x="166.75" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="81.79" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="178.62" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="93.66" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st68" x="190.49" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st52" x="207.98" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st52" x="219.85" y="396.94" width="9.37" height="9.37" rx="3" ry="3"/>
+  <path class="st46" d="M74.29,395.69v-13.56"/>
+  <polygon class="st29" points="74.29 377.45 76.79 382.45 71.79 382.45 74.29 377.45"/>
+  <path class="st46" d="M172.99,395.69v-13.56"/>
+  <polygon class="st29" points="172.99 377.45 175.49 382.45 170.5 382.45 172.99 377.45"/>
+  <path class="st37" d="M218.6,395.69v-13.56"/>
+  <polygon class="st52" points="218.6 377.45 221.1 382.45 216.1 382.45 218.6 377.45"/>
+  <text class="st23" transform="translate(51.79 417.55)"><tspan x="0" y="0">dense/sparse</tspan></text>
+  <text class="st23" transform="translate(52.94 426.92)"><tspan x="0" y="0">features ~1K</tspan></text>
+  <text class="st23" transform="translate(147.37 417.55)"><tspan x="0" y="0">user interaction</tspan></text>
+  <text class="st23" transform="translate(154.14 426.92)"><tspan x="0" y="0">history ~2K</tspan></text>
+  <text class="st23" transform="translate(202.34 417.55)"><tspan x="0" y="0">ad latents</tspan></text>
+  <path class="st46" d="M123.64,228.27v-13.93"/>
+  <polygon class="st29" points="123.64 207.16 127.39 214.65 119.9 214.65 123.64 207.16"/>
+  <rect class="st39" x="296.06" y="319.48" width="84.96" height="124.94" rx="12" ry="12"/>
+  <circle class="st40" cx="298.56" cy="320.73" r="9.37"/>
+  <text class="st1" transform="translate(295.78 324.47)"><tspan x="0" y="0">2</tspan></text>
+  <text class="st14" transform="translate(325.42 334.63)"><tspan x="0" y="0">Latent</tspan></text>
+  <text class="st14" transform="translate(312.54 345.09)"><tspan x="0" y="0">factorization</tspan></text>
+  <rect class="st32" x="304.81" y="354.46" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="321.67" y="354.46" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st36" x="338.54" y="354.46" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="355.41" y="354.46" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st36" x="304.81" y="365.7" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="321.67" y="365.7" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="338.54" y="365.7" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="355.41" y="365.7" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="304.81" y="376.95" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="321.67" y="376.95" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st32" x="338.54" y="376.95" width="13.74" height="8.75" rx="3" ry="3"/>
+  <rect class="st36" x="355.41" y="376.95" width="13.74" height="8.75" rx="3" ry="3"/>
+  <text class="st6" transform="translate(312.98 398.5)"><tspan class="st54"><tspan x="0" y="0">ad latents learnt</tspan></tspan><tspan class="st54"><tspan x="2.19" y="8.62">by a codebook</tspan></tspan><tspan class="st54"><tspan x="-.19" y="25.86">fixed cardinality </tspan></tspan><tspan class="st65" x="-1" y="35.23">→ </tspan><tspan class="st54" x="8.98" y="35.23">bounded cost</tspan></text>
+  <text/>
+  <path class="st37" d="M294.81,401.94h-55.66"/>
+  <polygon class="st52" points="232.59 401.94 239.46 398.5 239.46 405.37 232.59 401.94"/>
+  <rect class="st55" x="417.25" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st57" x="429.12" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st56" x="440.99" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st58" x="452.86" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st60" x="464.73" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st59" x="476.6" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st61" x="488.47" y="257.01" width="9.37" height="9.37" rx="3" ry="3"/>
+  <polygon class="st62" points="293.81 207.84 302.12 207.41 299.18 214.28 293.81 207.84"/>
+  <rect class="st38" x="398.51" y="279.5" width="173.67" height="122.44" rx="12" ry="12"/>
+  <rect class="st31" x="407.26" y="308.86" width="43.73" height="48.73" rx="6" ry="6"/>
+  <rect class="st70" x="414.75" y="315.1" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st72" x="414.75" y="323.85" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st71" x="414.75" y="332.6" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <text class="st2" transform="translate(414.95 350.09)"><tspan x="0" y="0">Expert 1</tspan></text>
+  <rect class="st31" x="457.23" y="308.86" width="43.73" height="48.73" rx="6" ry="6"/>
+  <rect class="st70" x="464.73" y="315.1" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st72" x="464.73" y="323.85" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st71" x="464.73" y="332.6" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <text class="st2" transform="translate(464.92 350.09)"><tspan x="0" y="0">Expert 2</tspan></text>
+  <rect class="st31" x="519.7" y="308.86" width="43.73" height="48.73" rx="6" ry="6"/>
+  <rect class="st70" x="527.2" y="315.1" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st72" x="527.2" y="323.85" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <rect class="st71" x="527.2" y="332.6" width="28.74" height="6.25" rx="2.78" ry="2.78"/>
+  <text class="st2" transform="translate(527.19 350.09)"><tspan x="0" y="0">Expert n</tspan></text>
+  <text class="st8" transform="translate(504.71 336.34)"><tspan x="0" y="0">…</tspan></text>
+  <text class="st18" transform="translate(405.74 373.83)"><tspan x="0" y="0">Lossless compression of ad &amp; context features</tspan></text>
+  <text class="st21" transform="translate(427.44 386.62)"><tspan class="st67" x="0" y="0">→ better </tspan><tspan class="st64" x="32.12" y="0">①</tspan><tspan class="st67" x="39.92" y="0" xml:space="preserve"> queries and </tspan><tspan class="st63" x="85.07" y="0">②</tspan><tspan class="st66" x="92.88" y="0" xml:space="preserve"> latents</tspan></text>
+  <text/>
+  <path class="st41" d="M457.23,278.25v-4.37"/>
+  <polygon class="st62" points="457.23 267.94 460.35 274.19 454.11 274.19 457.23 267.94"/>
+  <path class="st41" d="M397.26,356.96h-9.37"/>
+  <polygon class="st62" points="381.95 356.96 388.2 353.83 388.2 360.08 381.95 356.96"/>
+  <rect class="st38" x="398.51" y="419.43" width="173.67" height="24.99" rx="10" ry="10"/>
+  <text class="st24" transform="translate(442.34 435.05)"><tspan x="0" y="0">Ad + context features</tspan></text>
+  <path class="st41" d="M485.34,418.18v-7.68"/>
+  <polygon class="st62" points="485.34 403.31 489.09 410.81 481.59 410.81 485.34 403.31"/>
+  <rect class="st34" x="37.44" y="93.73" width="364.82" height="115.8" rx="12" ry="12"/>
+  <circle class="st40" cx="39.93" cy="95.21" r="9.37"/>
+  <text class="st1" transform="translate(37.16 98.96)"><tspan x="0" y="0">1</tspan></text>
+  <text class="st27" transform="translate(53.68 108.33)"><tspan x="0" y="0">Long-sequence cross-attention · warp-specialized kernel</tspan></text>
+  <rect class="st42" x="43.68" y="114.58" width="149.93" height="57.47" rx="10" ry="10"/>
+  <text class="st20" transform="translate(51.18 125.82)"><tspan x="0" y="0">Shared memory · user KV cache</tspan></text>
+  <rect class="st68" x="51.18" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="63.05" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="74.92" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st68" x="86.79" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="98.66" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st53" x="110.53" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <text class="st28" transform="translate(124.21 138.32)"><tspan x="0" y="0">+</tspan></text>
+  <rect class="st48" x="134.26" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st51" x="146.13" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st50" x="158" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st49" x="169.87" y="130.82" width="9.37" height="9.37" rx="3" ry="3"/>
+  <text class="st13" transform="translate(61.86 151.46)"><tspan x="0" y="0">user interaction </tspan><tspan x="-.7" y="8.62">history (len ~1K)</tspan></text>
+  <text class="st17" transform="translate(131.68 151.56)"><tspan x="0" y="0">ad latent aware </tspan><tspan x="-5.16" y="8.25">user representation</tspan></text>
+  <path class="st45" d="M118.65,184.54v-5.56"/>
+  <polygon class="st69" points="118.65 173.67 121.46 179.3 115.83 179.3 118.65 173.67"/>
+  <text class="st17" transform="translate(123.64 182.04)"><tspan x="0" y="0">load once</tspan></text>
+  <rect class="st35" x="43.68" y="185.79" width="149.93" height="19.99" rx="8" ry="8"/>
+  <text class="st0" transform="translate(66.52 198.91)"><tspan x="0" y="0">Producer warp · loads data</tspan></text>
+  <path class="st46" d="M194.86,143.31h14.93"/>
+  <polygon class="st29" points="215.1 143.31 209.48 146.12 209.48 140.5 215.1 143.31"/>
+  <text class="st22" transform="translate(198.87 138.32)"><tspan x="0" y="0">K/V</tspan></text>
+  <rect class="st35" x="216.1" y="114.58" width="99.95" height="91.21" rx="10" ry="10"/>
+  <text class="st0" transform="translate(233.13 125.82)"><tspan x="0" y="0">Consumer warps</tspan></text>
+  <rect class="st44" x="223.59" y="130.82" width="84.96" height="16.24" rx="6" ry="6"/>
+  <text class="st11" transform="translate(244 141.44)"><tspan x="0" y="0">Sub-group 1</tspan></text>
+  <rect class="st44" x="223.59" y="150.81" width="84.96" height="16.24" rx="6" ry="6"/>
+  <text class="st11" transform="translate(244 161.43)"><tspan x="0" y="0">Sub-group 2</tspan></text>
+  <rect class="st62" x="243.59" y="174.55" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st62" x="255.45" y="174.55" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st62" x="267.32" y="174.55" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st62" x="279.19" y="174.55" width="9.37" height="9.37" rx="3" ry="3"/>
+  <text class="st2" transform="translate(243.12 196.41)"><tspan x="0" y="0">Q: ad experts</tspan></text>
+  <path class="st45" d="M317.3,160.18h7.5"/>
+  <rect class="st69" x="326.04" y="125.82" width="73.71" height="68.72" rx="10" ry="10"/>
+  <text class="st1" transform="translate(342.36 147.06)"><tspan x="0" y="0">WGMMA</tspan></text>
+  <text class="st4" transform="translate(341.42 159.55)"><tspan x="0" y="0">tensor cores</tspan></text>
+  <text class="st5" transform="translate(339.41 177.05)"><tspan x="0" y="0">NVIDIA Hopper</tspan></text>
+  <rect class="st34" x="412.25" y="93.73" width="162.42" height="115.96" rx="12" ry="12"/>
+  <circle class="st40" cx="412.25" cy="93.96" r="9.37"/>
+  <text class="st1" transform="translate(409.47 97.71)"><tspan x="0" y="0">4</tspan></text>
+  <text class="st27" transform="translate(418.47 108.33)"><tspan x="0" y="0">GPU-accelerated cross features</tspan></text>
+  <path class="st33" d="M431.01,122.7h35.93c5.16,0,9.34,3.64,9.34,8.12h0c0,4.49-4.18,8.12-9.34,8.12h-35.93c-5.16,0-9.34-3.64-9.34-8.12h0c0-4.49,4.18-8.12,9.34-8.12Z"/>
+  <text class="st15" transform="translate(424.12 133.52)"><tspan x="0" y="0">Inverted index</tspan></text>
+  <path class="st45" d="M477.85,130.82h8.75"/>
+  <polygon class="st69" points="492.53 130.82 486.28 133.94 486.28 127.7 492.53 130.82"/>
+  <rect class="st31" x="495.34" y="125.2" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st43" x="510.33" y="125.2" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(513.96 133.63)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st31" x="525.32" y="125.2" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st43" x="540.31" y="125.2" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(543.94 133.63)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st31" x="555.31" y="125.2" width="11.24" height="11.24" rx="4" ry="4"/>
+  <path class="st45" d="M362.9,124.57V52.34"/>
+  <polygon class="st69" points="362.9 44.74 366.65 52.23 359.15 52.23 362.9 44.74"/>
+  <g>
+    <line class="st45" x1="490.96" y1="99.58" x2="397.96" y2="47.9"/>
+    <polygon class="st69" points="400.74 45.16 393.26 45.29 397.1 51.7 400.74 45.16"/>
+  </g>
+  <g>
+    <rect class="st29" x="180.21" y="468.6" width="8.75" height="8.75" rx="3" ry="3"/>
+    <text class="st9" transform="translate(193.33 475.39)"><tspan x="0" y="0">User side · request-only</tspan></text>
+  </g>
+  <g>
+    <rect class="st62" x="449.11" y="468.6" width="8.75" height="8.75" rx="3" ry="3"/>
+    <text class="st9" transform="translate(462.23 475.39)"><tspan x="0" y="0">Ad side · precomputed</tspan></text>
+  </g>
+  <g>
+    <rect class="st69" x="41.99" y="468.6" width="8.75" height="8.75" rx="3" ry="3"/>
+    <text class="st9" transform="translate(55.11 475.39)"><tspan x="0" y="0">mix · billion QPS on GPUs</tspan></text>
+  </g>
+  <g>
+    <rect class="st52" x="302.31" y="468.6" width="8.75" height="8.75" rx="3" ry="3"/>
+    <text class="st9" transform="translate(315.43 475.39)"><tspan x="0" y="0">Latent factorization codebook</tspan></text>
+  </g>
+  <rect class="st52" x="107.72" y="397.06" width="9.37" height="9.37" rx="3" ry="3"/>
+  <rect class="st52" x="119.59" y="397.06" width="9.37" height="9.37" rx="3" ry="3"/>
+  <path class="st37" d="M118.34,395.81v-13.56"/>
+  <polygon class="st52" points="118.34 377.57 120.84 382.57 115.84 382.57 118.34 377.57"/>
+  <text class="st23" transform="translate(102.09 417.68)"><tspan x="0" y="0">ad latents</tspan></text>
+  <text class="st3" transform="translate(297.16 280.77)"><tspan x="0" y="0">recouple user/ad </tspan><tspan x="15.28" y="11.99">two towers</tspan></text>
+  <g>
+    <line class="st37" x1="383.49" y1="296.36" x2="292.3" y2="296.36"/>
+    <polygon class="st52" points="382.39 292.62 388.87 296.36 382.39 300.1 382.39 292.62"/>
+    <polygon class="st52" points="293.4 292.62 286.92 296.36 293.4 300.1 293.4 292.62"/>
+  </g>
+  <circle class="st40" cx="389.14" cy="229.52" r="9.37"/>
+  <text class="st1" transform="translate(386.36 233.27)"><tspan x="0" y="0">3</tspan></text>
+  <path class="st41" d="M401.01,255.76l-101.89-44.42"/>
+  <path class="st33" d="M431.01,165.87h35.93c5.16,0,9.34,4.72,9.34,10.55h0c0,5.82-4.18,10.55-9.34,10.55h-35.93c-5.16,0-9.34-4.72-9.34-10.55h0c0-5.82,4.18-10.55,9.34-10.55Z"/>
+  <text class="st15" transform="translate(428.7 173.73)"><tspan x="0" y="0">GPU Sigrid</tspan><tspan x="5.62" y="9">Preproc</tspan></text>
+  <path class="st45" d="M477.85,176.42h8.75"/>
+  <polygon class="st69" points="492.53 176.42 486.28 179.54 486.28 173.3 492.53 176.42"/>
+  <rect class="st31" x="495.34" y="160.8" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st43" x="510.33" y="160.8" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(513.96 169.24)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st31" x="525.32" y="160.8" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st43" x="540.31" y="160.8" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(543.94 169.24)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st31" x="555.31" y="160.8" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st42" x="525.32" y="180.19" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(543.94 196.74)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st42" x="555.31" y="180.19" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st30" x="495.34" y="180.19" width="11.24" height="11.24" rx="4" ry="4"/>
+  <text class="st10" transform="translate(498.96 188.62)"><tspan x="0" y="0">3</tspan></text>
+  <rect class="st42" x="510.33" y="180.19" width="11.24" height="11.24" rx="4" ry="4"/>
+  <rect class="st42" x="540.31" y="180.19" width="11.24" height="11.24" rx="4" ry="4"/>
+</svg>

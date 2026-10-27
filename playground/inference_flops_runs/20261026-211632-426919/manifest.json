@@ -1,0 +1,92 @@
+{
+  "status": "complete",
+  "smoke": false,
+  "output": "/home/hylu/hylucode/research/rails/playground/inference_flops_runs/20261026-211632-426919",
+  "checkpoint_root": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653",
+  "torch": "2.9.0+cu128",
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "dtype": "float32",
+  "tf32": false,
+  "seed": 42,
+  "catalog_size": 3883,
+  "models": {
+    "sasrec": {
+      "config": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/sasrec-sampled-softmax-n128-final.gin",
+      "config_sha256": "10b3ec1a2f1fa0d0995d92a36525b0bdbaa899dbfd27062d6dcd43ec5f3b99c8",
+      "checkpoint": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/best.pt",
+      "checkpoint_sha256": "0120cbcd2d79d50f2ffff37ca5e7456b613972043f23faa25679834148df2d47",
+      "epoch": 89,
+      "dimension": 50,
+      "operative_config": "# Parameters for get_sequential_encoder:\n# ==============================================================================\nget_sequential_encoder.activation_checkpoint = False\n\n# Parameters for get_similarity_function:\n# ==============================================================================\nget_similarity_function.activation_checkpoint = False\nget_similarity_function.bf16_training = False\n\n# Parameters for sasrec_encoder:\n# ==============================================================================\nsasrec_encoder.ffn_activation_fn = 'relu'\nsasrec_encoder.ffn_dropout_rate = 0.2\nsasrec_encoder.ffn_hidden_dim = 50\nsasrec_encoder.num_blocks = 2\nsasrec_encoder.num_heads = 1\n"
+    },
+    "sasrec_mol": {
+      "config": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/sasrec-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+      "config_sha256": "1543fa07a30648b29fec180f0caf45bacb81452c25780a19534cb309bbc4364a",
+      "checkpoint": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/best.pt",
+      "checkpoint_sha256": "18716ab0b4750fb367d4f1f5d96d79eb70e95a11996dee28c9f97b34aaa03d76",
+      "epoch": 82,
+      "dimension": 50,
+      "operative_config": "# Parameters for create_mol_interaction_module:\n# ==============================================================================\ncreate_mol_interaction_module.dot_product_dimension = 64\ncreate_mol_interaction_module.dot_product_l2_norm = True\ncreate_mol_interaction_module.eps = 1e-06\ncreate_mol_interaction_module.gating_combination_type = 'glu_silu'\ncreate_mol_interaction_module.gating_item_dropout_rate = 0.0\ncreate_mol_interaction_module.gating_item_fn = True\ncreate_mol_interaction_module.gating_item_hidden_dim = 128\ncreate_mol_interaction_module.gating_qi_dropout_rate = 0.0\ncreate_mol_interaction_module.gating_qi_hidden_dim = 128\ncreate_mol_interaction_module.gating_query_fn = True\ncreate_mol_interaction_module.gating_query_hidden_dim = 128\ncreate_mol_interaction_module.item_dot_product_groups = 4\ncreate_mol_interaction_module.item_dropout_rate = 0.1\ncreate_mol_interaction_module.item_hidden_dim = -1\ncreate_mol_interaction_module.item_nonlinearity = 'swiglu'\ncreate_mol_interaction_module.query_dot_product_groups = 8\ncreate_mol_interaction_module.query_dropout_rate = 0.0\ncreate_mol_interaction_module.query_hidden_dim = 512\ncreate_mol_interaction_module.query_nonlinearity = 'swiglu'\ncreate_mol_interaction_module.softmax_dropout_rate = 0.2\ncreate_mol_interaction_module.temperature = 0.05\ncreate_mol_interaction_module.uid_dropout_rate = 0.5\ncreate_mol_interaction_module.uid_embedding_hash_sizes = [6040]\ncreate_mol_interaction_module.uid_embedding_level_dropout = False\n\n# Parameters for get_sequential_encoder:\n# ==============================================================================\nget_sequential_encoder.activation_checkpoint = False\n\n# Parameters for get_similarity_function:\n# ==============================================================================\nget_similarity_function.activation_checkpoint = False\nget_similarity_function.bf16_training = False\n\n# Parameters for sasrec_encoder:\n# ==============================================================================\nsasrec_encoder.ffn_activation_fn = 'relu'\nsasrec_encoder.ffn_dropout_rate = 0.2\nsasrec_encoder.ffn_hidden_dim = 50\nsasrec_encoder.num_blocks = 2\nsasrec_encoder.num_heads = 1\n"
+    },
+    "hstu": {
+      "config": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/hstu-sampled-softmax-n128-rails-final.gin",
+      "config_sha256": "306ea6590b81e4399f7e3814fc820d0d6652416e213f67ca5f72fa095f7859a9",
+      "checkpoint": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/best.pt",
+      "checkpoint_sha256": "69e01d2f1d13bf2f512e4cb2096bcd69189f18a431c7789cd123b540064c738f",
+      "epoch": 98,
+      "dimension": 50,
+      "operative_config": "# Parameters for get_sequential_encoder:\n# ==============================================================================\nget_sequential_encoder.activation_checkpoint = False\n\n# Parameters for get_similarity_function:\n# ==============================================================================\nget_similarity_function.activation_checkpoint = False\nget_similarity_function.bf16_training = False\n\n# Parameters for hstu_encoder:\n# ==============================================================================\nhstu_encoder.attn_dropout_rate = 0.0\nhstu_encoder.concat_ua = False\nhstu_encoder.dqk = 25\nhstu_encoder.dv = 25\nhstu_encoder.enable_relative_attention_bias = True\nhstu_encoder.linear_activation = 'silu'\nhstu_encoder.linear_config = 'uvqk'\nhstu_encoder.linear_dropout_rate = 0.2\nhstu_encoder.normalization = 'rel_bias'\nhstu_encoder.num_blocks = 8\nhstu_encoder.num_heads = 2\n"
+    },
+    "hstu_mol": {
+      "config": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/hstu-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+      "config_sha256": "a4bc9b531592e048ed540b9382f563f87d8719db64cb24368a1f272b9a01db28",
+      "checkpoint": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/best.pt",
+      "checkpoint_sha256": "4ec512833f524cd0cbf1129ab5229dd304c1c859b0b575638fe043423b9a6a2a",
+      "epoch": 79,
+      "dimension": 50,
+      "operative_config": "# Parameters for create_mol_interaction_module:\n# ==============================================================================\ncreate_mol_interaction_module.dot_product_dimension = 64\ncreate_mol_interaction_module.dot_product_l2_norm = True\ncreate_mol_interaction_module.eps = 1e-06\ncreate_mol_interaction_module.gating_combination_type = 'glu_silu'\ncreate_mol_interaction_module.gating_item_dropout_rate = 0.0\ncreate_mol_interaction_module.gating_item_fn = True\ncreate_mol_interaction_module.gating_item_hidden_dim = 128\ncreate_mol_interaction_module.gating_qi_dropout_rate = 0.0\ncreate_mol_interaction_module.gating_qi_hidden_dim = 128\ncreate_mol_interaction_module.gating_query_fn = True\ncreate_mol_interaction_module.gating_query_hidden_dim = 128\ncreate_mol_interaction_module.item_dot_product_groups = 4\ncreate_mol_interaction_module.item_dropout_rate = 0.1\ncreate_mol_interaction_module.item_hidden_dim = -1\ncreate_mol_interaction_module.item_nonlinearity = 'swiglu'\ncreate_mol_interaction_module.query_dot_product_groups = 8\ncreate_mol_interaction_module.query_dropout_rate = 0.0\ncreate_mol_interaction_module.query_hidden_dim = 512\ncreate_mol_interaction_module.query_nonlinearity = 'swiglu'\ncreate_mol_interaction_module.softmax_dropout_rate = 0.2\ncreate_mol_interaction_module.temperature = 0.05\ncreate_mol_interaction_module.uid_dropout_rate = 0.5\ncreate_mol_interaction_module.uid_embedding_hash_sizes = [6040]\ncreate_mol_interaction_module.uid_embedding_level_dropout = False\n\n# Parameters for get_sequential_encoder:\n# ==============================================================================\nget_sequential_encoder.activation_checkpoint = False\n\n# Parameters for get_similarity_function:\n# ==============================================================================\nget_similarity_function.activation_checkpoint = False\nget_similarity_function.bf16_training = False\n\n# Parameters for hstu_encoder:\n# ==============================================================================\nhstu_encoder.attn_dropout_rate = 0.0\nhstu_encoder.concat_ua = False\nhstu_encoder.dqk = 25\nhstu_encoder.dv = 25\nhstu_encoder.enable_relative_attention_bias = True\nhstu_encoder.linear_activation = 'silu'\nhstu_encoder.linear_config = 'uvqk'\nhstu_encoder.linear_dropout_rate = 0.2\nhstu_encoder.normalization = 'rel_bias'\nhstu_encoder.num_blocks = 8\nhstu_encoder.num_heads = 2\n"
+    }
+  },
+  "convention": "MAC=2; arithmetic separate from special functions; cached items shared across B users",
+  "source_sha256": {
+    "modeling/similarity_utils.py": "dbc5705cc6a1f07d0d2e7ca28811309d383b8641de5dc395e510102810313b9f",
+    "modeling/initialization.py": "486ba886bea581808efa1e0cd75a1b177a368f199a156604945e3a994e3cea2f",
+    "modeling/similarity_module.py": "6b93ca62c85e257a8e59cf2f08ab1db17e346e8ca2a7deb8a80baa651d014841",
+    "modeling/sequential/input_features_preprocessors.py": "1838e8d05a253bcad6c80971c7bb420c1281630fcfe16c317db1f1515ad3b5db",
+    "modeling/sequential/utils.py": "65e5d2d80a497ae153d4043c4bffa90c4a2b2b369adc4134e038e1b47d4d01ab",
+    "modeling/sequential/autoregressive_losses.py": "4cda50cce1e19080953c97c6d3ec69b28140c2b17f892bd2d52eae26f46607f8",
+    "modeling/sequential/sasrec.py": "90d94a19552e837176d7bdf7b5ef62bf3afff6394bda5e7dd63d5612355d9591",
+    "modeling/sequential/features.py": "02b0152e09d7a311b58f787a250918d6e8401f82af0c7fc321aee9a4651b64a3",
+    "modeling/sequential/hstu.py": "84ceef8772147cd1fd9f32f6c8908341b7b7478f4ad7cdfebce61ebf93d57523",
+    "modeling/sequential/encoder_utils.py": "4ae96acc309ecaa3337d374ea64a7e0456bebaea8cfec6e4d41bf6847a76842f",
+    "modeling/sequential/embedding_modules.py": "15c5ead596bfc334ccda0fe855583230593f8098fac361e04dbdebc249283d93",
+    "modeling/sequential/output_postprocessors.py": "54ed0719f5ad3667b8acf1ceaa3e7bbec353163070476bb5fc84496726eee274",
+    "modeling/sequential/losses/sampled_softmax.py": "655021a3ad4a7401cbf2c388e08a1d8fa1eee8b94a2aca3a5027acd5aa39a730",
+    "rails/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rails/indexing/mips_top_k.py": "6e4f3109c4f3228a5b90374beff1dd0b883001ef127693362717008cf41f420d",
+    "rails/indexing/mol_top_k.py": "24c9b4415904ce883626ccfb7a727f0ac32946aa7f00d8eab562255e53d8da66",
+    "rails/indexing/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rails/indexing/candidate_index.py": "f90d57c74de33f3c9ee56352fe863050c832ee7a0d7eb61d6a58dd8db7080494",
+    "rails/similarities/dot_product_similarity_fn.py": "be2285a3f523d8ffd21b422175a5e5b1eb8c1f72e8890af1653b4bdc25d10394",
+    "rails/similarities/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rails/similarities/module.py": "1c1d213aff9632b1d6edaacf32a4884776bbfe2cd6db9a01f664196c86ffd596",
+    "rails/similarities/layers.py": "d175dd79008011564531ac1e81e6bcc0d64120fb809a66031da48bbb875f628a",
+    "rails/similarities/mol/embeddings_fn.py": "94192f9d47eb5d6fefc28fa1d46f241d20e5a658dbfff8f40f3b46df1b9d6131",
+    "rails/similarities/mol/item_embeddings_fns.py": "c651e1046cd879b3e8c349cbe090d588a92e8e1518bf861f21839c682ce10615",
+    "rails/similarities/mol/similarity_fn.py": "a99e49fecf623204dde939b802e7bc038831acd4c239d4dc4147a0e128532790",
+    "rails/similarities/mol/query_embeddings_fns.py": "75cc775dc73514ca301463878e31c57c24338776a824fc44195d01dd249208a9",
+    "playground/benchmark_inference_flops.py": "95410d2591158ffc76f35ca892d3d506cc5a9ac5f8ed0ac1de521656c6cb264d",
+    "playground/inference_flops_counter.py": "e72e91e4302a97d482ede5f10056b200e1108ab74d7f02c9f59146bcff6b0da1",
+    "playground/test_inference_flops_counter.py": "664781e1f55b3cd2edacca7dab6274898d5e81c96fed7e0e85a0ec33febab408",
+    "playground/rails_inference_flops_benchmark_plan.md": "444a1e33a4815280a0619272e3fb8313e1bdb9de179462e6ab39bedeb38eb8d5"
+  },
+  "cases": 128,
+  "max_absolute_score_error": 0.0,
+  "finished_local": "2026-10-26T21:18:07.071384-07:00",
+  "counter_unit_tests": 7,
+  "data_sha256": {
+    "tmp/processed/ml-1m/movies.csv": "efdbb1859c29c6699bc544e0e27b6d69c452216268b1dd41eaaef7a755e3349e",
+    "tmp/ml-1m/sasrec_format.csv": "2582a9946b0fa5b96e393f03cb0cd5f22e8977d93ccef99aff2b3e06863912de"
+  }
+}

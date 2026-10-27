@@ -1,0 +1,190 @@
+diff --git a/eval_from_checkpoint.py b/eval_from_checkpoint.py
+index e307659..fa901ba 100755
+--- a/eval_from_checkpoint.py
++++ b/eval_from_checkpoint.py
+@@ -49,6 +49,7 @@ from dataclasses import dataclass
+ import math, statistics
+ from typing import Any, Dict, List, Optional, Tuple
+ import logging
++import json
+ import random
+ import itertools
+ 
+@@ -117,6 +118,7 @@ flags.DEFINE_boolean(
+     "include_eval_time", False, "Please set this to False for strict accuracy checks."
+ )
+ flags.DEFINE_string("eval_dtype", "", "If non-empty, run eval in this dtype.")
++flags.DEFINE_string("metrics_output", "", "Optional JSON file for accuracy metrics.")
+ flags.DEFINE_boolean(
+     "eval_against_brute_force", False, "If true, eval against brute force."
+ )
+@@ -203,6 +205,7 @@ def train_fn(
+     l2_norm_eps: float = 1e-6,
+     enable_tf32: bool = False,
+     opt_enable_apex: bool = False,
++    metrics_output: str = "",
+ ) -> None:
+     random.seed(42)
+     torch.manual_seed(42)
+@@ -258,7 +261,7 @@ def train_fn(
+         item_embedding_dim=item_embedding_dim,
+     )
+ 
+-    if main_module == "HSTU":
++    if main_module in ("HSTU", "SASRec"):
+         assert (
+             user_embedding_norm == "l2_norm" or user_embedding_norm == "layer_norm"
+         ), f"Not implemented for {user_embedding_norm}"
+@@ -489,7 +492,12 @@ def train_fn(
+         hr_10 = _avg(eval_dict_all["hr@10"], world_size=world_size)
+         hr_50 = _avg(eval_dict_all["hr@50"], world_size=world_size)
+         hr_100 = _avg(eval_dict_all["hr@100"], world_size=world_size)
++        hr_200 = _avg(eval_dict_all["hr@200"], world_size=world_size)
+         mrr = _avg(eval_dict_all["mrr"], world_size=world_size)
++        if metrics_output:
++            with open(metrics_output, "w") as f:
++                json.dump({"epoch": epoch, "metrics": {k: float(_avg(v, world_size=world_size))
++                    for k, v in eval_dict_all.items() if "eval_time" not in k}}, f, indent=2)
+ 
+         logging.info(
+             f"eval @ epoch {epoch} ({eval_iter + 1} iters, {(eval_iter + 1) * eval_batch_size} evaluated) in {time.time() - eval_start_time:.2f}s: "
+@@ -511,8 +519,8 @@ def train_fn(
+                 f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100},{eval_time_avg_ms:.3f},{eval_time_dev_ms:.3f}"
+             )
+         else:
+-            logging.info("HR@1,HR@5,HR@10,HR@50,HR@100")
+-            logging.info(f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100}")
++            logging.info("HR@1,HR@5,HR@10,HR@50,HR@100,HR@200,MRR")
++            logging.info(f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100},{hr_200},{mrr}")
+ 
+     cleanup()
+ 
+@@ -529,6 +537,7 @@ def mp_train_fn(
+     include_eval_time: bool,
+     eval_dtype: str,
+     eval_against_brute_force: bool,
++    metrics_output: str,
+ ) -> None:
+     if gin_config_file is not None:
+         # Hack as absl doesn't support flag parsing inside multiprocessing.
+@@ -547,6 +556,7 @@ def mp_train_fn(
+         include_eval_time=include_eval_time,
+         eval_dtype=eval_dtype,
+         eval_against_brute_force=eval_against_brute_force,
++        metrics_output=metrics_output,
+     )
+ 
+ 
+@@ -568,6 +578,7 @@ def main(argv):
+             FLAGS.include_eval_time,
+             FLAGS.eval_dtype,
+             FLAGS.eval_against_brute_force,
++            FLAGS.metrics_output,
+         ),
+         nprocs=world_size,
+         join=True,
+diff --git a/train.py b/train.py
+index b5f8de1..c270dbc 100644
+--- a/train.py
++++ b/train.py
+@@ -20,6 +20,7 @@ Main entry point for model training. Please refer to README.md for usage instruc
+ """
+ 
+ import logging
++import json
+ import os
+ import random
+ 
+@@ -146,6 +147,8 @@ def train_fn(
+     l2_norm_eps: float = 1e-6,
+     enable_tf32: bool = False,
+     random_seed: int = 42,
++    benchmark_output_dir: str = "",
++    smoke_steps: int = 0,
+ ) -> None:
+     # to enable more deterministic results.
+     random.seed(random_seed)
+@@ -337,6 +340,13 @@ def train_fn(
+     # torch.autograd.set_detect_anomaly(True)
+ 
+     batch_id = 0
++    benchmark_started = time.time()
++    best_hr10 = float("-inf")
++    if benchmark_output_dir:
++        os.makedirs(benchmark_output_dir, exist_ok=True)
++        with open(os.path.join(benchmark_output_dir, "operative_config.gin"), "w") as f:
++            f.write(gin.operative_config_str())
++    torch.cuda.reset_peak_memory_stats(device)
+     while epoch < num_epochs:
+         if train_data_sampler is not None:
+             train_data_sampler.set_epoch(epoch)
+@@ -350,7 +360,7 @@ def train_fn(
+                 max_output_length=gr_output_length + 1,
+             )
+ 
+-            if (batch_id % eval_interval) == 0:
++            if not smoke_steps and (batch_id % eval_interval) == 0:
+                 model.eval()
+ 
+                 eval_state = get_eval_state(
+@@ -435,6 +445,10 @@ def train_fn(
+             main_loss = loss.detach().clone()
+             loss = get_weighted_loss(loss, aux_losses, weights=loss_weights)
+             loss.backward()
++            if smoke_steps:
++                assert torch.isfinite(loss).all(), "Non-finite smoke loss"
++                gradients = [p.grad for p in model.parameters() if p.grad is not None]
++                assert gradients and all(torch.isfinite(g).all() for g in gradients), "Non-finite smoke gradients"
+ 
+             # Optional linear warmup.
+             if batch_id < num_warmup_steps:
+@@ -461,6 +475,12 @@ def train_fn(
+             opt.step()
+ 
+             batch_id += 1
++            if smoke_steps and batch_id >= smoke_steps:
++                logging.info("SMOKE_OK steps=%s loss=%s peak_memory_bytes=%s", batch_id, loss.item(), torch.cuda.max_memory_allocated(device))
++                if writer is not None:
++                    writer.close()
++                cleanup()
++                return
+ 
+         def is_full_eval(epoch: int) -> bool:
+             return (epoch % full_eval_every_n) == 0
+@@ -535,7 +555,25 @@ def train_fn(
+                 prefix="eval_epoch_full",
+                 world_size=world_size,
+             )
+-        if rank == 0 and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
++        if rank == 0 and benchmark_output_dir:
++            metrics = {k: float(_avg(v, world_size=world_size)) for k, v in eval_dict_all.items()}
++            state = {
++                "epoch": epoch,
++                "batch_id": batch_id,
++                "model_state_dict": model.state_dict(),
++                "optimizer_state_dict": opt.state_dict(),
++                "metrics": metrics,
++            }
++            torch.save(state, os.path.join(benchmark_output_dir, "last.pt"))
++            is_best = metrics["hr@10"] > best_hr10
++            if is_best:
++                best_hr10 = metrics["hr@10"]
++                torch.save(state, os.path.join(benchmark_output_dir, "best.pt"))
++            with open(os.path.join(benchmark_output_dir, "epochs.jsonl"), "a") as f:
++                f.write(json.dumps({"epoch": epoch, "steps": batch_id, "metrics": metrics,
++                    "best_hr10": is_best, "elapsed_seconds": time.time() - benchmark_started,
++                    "peak_memory_bytes": torch.cuda.max_memory_allocated(device)}) + "\n")
++        if rank == 0 and not benchmark_output_dir and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
+             torch.save(
+                 {
+                     "epoch": epoch,
+@@ -558,6 +596,9 @@ def train_fn(
+             writer.flush()
+             writer.close()
+ 
++        if benchmark_output_dir:
++            cleanup()
++            return
+         torch.save(
+             {
+                 "epoch": epoch,

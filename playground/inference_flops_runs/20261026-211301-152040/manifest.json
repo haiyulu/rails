@@ -1,0 +1,34 @@
+{
+  "status": "failed",
+  "smoke": true,
+  "output": "/home/hylu/hylucode/research/rails/playground/inference_flops_runs/20261026-211301-152040",
+  "checkpoint_root": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653",
+  "torch": "2.9.0+cu128",
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "dtype": "float32",
+  "tf32": false,
+  "seed": 42,
+  "catalog_size": 3883,
+  "models": {
+    "sasrec": {
+      "config": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/sasrec-sampled-softmax-n128-final.gin",
+      "config_sha256": "10b3ec1a2f1fa0d0995d92a36525b0bdbaa899dbfd27062d6dcd43ec5f3b99c8",
+      "checkpoint": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/best.pt",
+      "checkpoint_sha256": "0120cbcd2d79d50f2ffff37ca5e7456b613972043f23faa25679834148df2d47",
+      "epoch": 89,
+      "dimension": 50,
+      "operative_config": "# Parameters for get_sequential_encoder:\n# ==============================================================================\nget_sequential_encoder.activation_checkpoint = False\n\n# Parameters for get_similarity_function:\n# ==============================================================================\nget_similarity_function.activation_checkpoint = False\nget_similarity_function.bf16_training = False\n\n# Parameters for sasrec_encoder:\n# ==============================================================================\nsasrec_encoder.ffn_activation_fn = 'relu'\nsasrec_encoder.ffn_dropout_rate = 0.2\nsasrec_encoder.ffn_hidden_dim = 50\nsasrec_encoder.num_blocks = 2\nsasrec_encoder.num_heads = 1\n"
+    }
+  },
+  "convention": "MAC=2; arithmetic separate from special functions; cached items shared across B users",
+  "source_sha256": {
+    "playground/benchmark_inference_flops.py": "95410d2591158ffc76f35ca892d3d506cc5a9ac5f8ed0ac1de521656c6cb264d",
+    "playground/inference_flops_counter.py": "7e8bc7d697e77e0f68875e77f1fb37fbc55e034cca9eb5a6453a2d7c44881681",
+    "modeling/sequential/sasrec.py": "90d94a19552e837176d7bdf7b5ef62bf3afff6394bda5e7dd63d5612355d9591",
+    "modeling/sequential/hstu.py": "84ceef8772147cd1fd9f32f6c8908341b7b7478f4ad7cdfebce61ebf93d57523",
+    "rails/similarities/mol/similarity_fn.py": "a99e49fecf623204dde939b802e7bc038831acd4c239d4dc4147a0e128532790",
+    "modeling/similarity_utils.py": "dbc5705cc6a1f07d0d2e7ca28811309d383b8641de5dc395e510102810313b9f"
+  },
+  "error": "RuntimeError(\"Unclassified floating operation: aten.linalg_norm.default; inputs=[{'shape': [1, 211, 50], 'dtype': 'torch.float32'}]\")"
+}

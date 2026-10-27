@@ -1,0 +1,340 @@
+{
+  "run_id": "20261026-201653",
+  "status": "complete",
+  "seed": 42,
+  "commands": [
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "playground/validate_ml1m_benchmark.py"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/validation.log",
+      "started": 1793071013.7618773,
+      "returncode": 0,
+      "duration_seconds": 4.540136814117432
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_smoke.log",
+      "started": 1793071018.30251,
+      "returncode": 0,
+      "duration_seconds": 15.31450605392456
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_smoke.log",
+      "started": 1793071033.6174881,
+      "returncode": 0,
+      "duration_seconds": 19.30055260658264
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_smoke.log",
+      "started": 1793071052.9185255,
+      "returncode": 0,
+      "duration_seconds": 15.351559162139893
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_smoke.log",
+      "started": 1793071068.2706254,
+      "returncode": 0,
+      "duration_seconds": 18.789536714553833
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/pretrained_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/ckpts/ml-1m-l200/HSTU-b8-h2-dqk25-dv25-lsilud0.2-ad0.0_MoL-8x4x64-t0.05-d0.2-l2-q512d0.0swiglu-id0.1-gq128-gi128d0.0-gqi128d0.0-x-glu_silu-uids6040d0.5_local_ssl-n128-lwuid_embedding_l2_norm:0.1-mi_loss:0.001-b128-lr0.001-wu0-wd0.001-2024-11-06_ep72",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/pretrained_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/pretrained_metrics.log",
+      "started": 1793071087.0607839,
+      "returncode": 0,
+      "duration_seconds": 19.389012575149536
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/sasrec-sampled-softmax-n128-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_train.log",
+      "started": 1793071106.4502432,
+      "returncode": 0,
+      "duration_seconds": 119.75000166893005
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/best.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_best_metrics.log",
+      "started": 1793071226.2017202,
+      "returncode": 0,
+      "duration_seconds": 16.4543776512146
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec/last.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_last_metrics.log",
+      "started": 1793071242.656617,
+      "returncode": 0,
+      "duration_seconds": 16.43129587173462
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/sasrec-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_train.log",
+      "started": 1793071259.0896442,
+      "returncode": 0,
+      "duration_seconds": 458.6434876918793
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/best.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_best_metrics.log",
+      "started": 1793071717.7346122,
+      "returncode": 0,
+      "duration_seconds": 19.38560962677002
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/sasrec_mol/last.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/sasrec_mol_last_metrics.log",
+      "started": 1793071737.120783,
+      "returncode": 0,
+      "duration_seconds": 19.497271299362183
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/hstu-sampled-softmax-n128-rails-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_train.log",
+      "started": 1793071756.6208313,
+      "returncode": 0,
+      "duration_seconds": 293.29096031188965
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/best.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_best_metrics.log",
+      "started": 1793072049.9135091,
+      "returncode": 0,
+      "duration_seconds": 16.47054648399353
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu/last.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_last_metrics.log",
+      "started": 1793072066.3846262,
+      "returncode": 0,
+      "duration_seconds": 16.418184995651245
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/hstu-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_train.log",
+      "started": 1793072082.8065455,
+      "returncode": 0,
+      "duration_seconds": 633.150621175766
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/best.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_best_metrics.log",
+      "started": 1793072715.9587064,
+      "returncode": 0,
+      "duration_seconds": 19.497206211090088
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/hstu_mol/last.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201653/logs/hstu_mol_last_metrics.log",
+      "started": 1793072735.4565084,
+      "returncode": 0,
+      "duration_seconds": 19.30729913711548
+    }
+  ],
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "revision": "90a12a4c920fb73e380950b281e80d6f2ad9e52c",
+  "gpu": "Mon Oct 26 20:16:53 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 595.112.07             Driver Version: 595.112.07     CUDA Version: 13.2     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 5090        Off |   00000000:01:00.0 Off |                  N/A |\n|  0%   41C    P8             16W /  600W |     860MiB /  32607MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A            1828      G   /usr/lib/xorg/Xorg                      504MiB |\n|    0   N/A  N/A            2124      G   /usr/bin/gnome-shell                     14MiB |\n|    0   N/A  N/A            4550      G   ...rack-uuid=3190708988185955192         97MiB |\n|    0   N/A  N/A           12101      G   ...rack-uuid=3190708988185955192        172MiB |\n+-----------------------------------------------------------------------------------------+\n",
+  "data_sha256": {
+    "tmp/ml-1m/sasrec_format.csv": "2582a9946b0fa5b96e393f03cb0cd5f22e8977d93ccef99aff2b3e06863912de",
+    "tmp/processed/ml-1m/movies.csv": "efdbb1859c29c6699bc544e0e27b6d69c452216268b1dd41eaaef7a755e3349e"
+  },
+  "deviations": [
+    "Modern uv environment for RTX 5090; original model/optimizer settings retained.",
+    "Two persistent data workers with prefetch factor 4; original iterator RNG draws preserved.",
+    "Single seed; no independent validation split; final and best evaluation epoch reported separately.",
+    "Checkpoint evaluator extended to support SASRec and export full metrics."
+  ],
+  "pretrained_sanity": {
+    "epoch": 72,
+    "metrics": {
+      "ndcg@1": 0.08741721510887146,
+      "ndcg@5": 0.16601979732513428,
+      "ndcg@10": 0.19990141689777374,
+      "ndcg@50": 0.25604483485221863,
+      "ndcg@100": 0.27258530259132385,
+      "ndcg@200": 0.2848159968852997,
+      "hr@1": 0.08741721510887146,
+      "hr@5": 0.24221853911876678,
+      "hr@10": 0.34735098481178284,
+      "hr@50": 0.6023178696632385,
+      "hr@100": 0.7041390538215637,
+      "hr@200": 0.7913907170295715,
+      "hr@500": 0.8879138827323914,
+      "hr@1000": 0.9427152276039124,
+      "mrr": 0.16940496861934662,
+      "ndcg@10_>=4": 0.18942417204380035,
+      "hr@10_>=4": 0.3315492868423462,
+      "hr@50_>=4": 0.5878873467445374,
+      "mrr_>=4": 0.1607307642698288
+    }
+  },
+  "active_model": "hstu_mol",
+  "source_sha256": {
+    "train.py": "0add06216c94e9c552fb260493afa2249129adfbcd9ce0656559d14330ac623f",
+    "eval_from_checkpoint.py": "4c37e0e91c02c72a506dc0be86217cecbb2863388eb7ffc17ca54d552ab51342",
+    "trainer/data_loader.py": "42db64625d646191af28135b4547c669ec0eefc570981288422f2dcd61661c2a",
+    "playground/run_ml1m_benchmark.py": "b4a99628a545a831ee0e032fdef26ac4b56b886f3ac3bfd5383b4558f1d82714",
+    "playground/validate_ml1m_benchmark.py": "d491aff2f088889fa25b96bc08ff4094c98d41cba35840732adf76a1a9eb8b5c"
+  },
+  "runtime_environment": {
+    "CUDA_VISIBLE_DEVICES": "0",
+    "OMP_NUM_THREADS": "8",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "audit": {
+    "completed_epochs": 404,
+    "successful_commands": 18,
+    "verified_checkpoints": 8,
+    "finished_local": "2026-10-26T20:46:18.339420-07:00"
+  }
+}

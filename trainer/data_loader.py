@@ -22,6 +22,14 @@ import gin
 import torch
 
 
+class ReusableDataLoader(torch.utils.data.DataLoader):
+    def __iter__(self):
+        if self.persistent_workers and self._iterator is not None:
+            # Match the parent RNG draw made by a fresh DataLoader iterator.
+            torch.empty((), dtype=torch.int64).random_(generator=self.generator)
+        return super().__iter__()
+
+
 @gin.configurable
 def create_data_loader(
     dataset: torch.utils.data.Dataset,
@@ -32,6 +40,7 @@ def create_data_loader(
     prefetch_factor: int = 128,
     num_workers: int = os.cpu_count(),
     drop_last: bool = False,
+    persistent_workers: bool = False,
 ) -> Tuple[
     Optional[torch.utils.data.distributed.DistributedSampler],
     torch.utils.data.DataLoader,
@@ -47,12 +56,13 @@ def create_data_loader(
         )
     else:
         sampler = None
-    data_loader = torch.utils.data.DataLoader(
+    data_loader = ReusableDataLoader(
         dataset,
         batch_size=batch_size,
         # shuffle=True, cannot use with sampler
         num_workers=num_workers,
         sampler=sampler,
         prefetch_factor=prefetch_factor,
+        persistent_workers=persistent_workers,
     )
     return sampler, data_loader

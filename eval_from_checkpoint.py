@@ -49,6 +49,7 @@ from dataclasses import dataclass
 import math, statistics
 from typing import Any, Dict, List, Optional, Tuple
 import logging
+import json
 import random
 import itertools
 
@@ -117,6 +118,7 @@ flags.DEFINE_boolean(
     "include_eval_time", False, "Please set this to False for strict accuracy checks."
 )
 flags.DEFINE_string("eval_dtype", "", "If non-empty, run eval in this dtype.")
+flags.DEFINE_string("metrics_output", "", "Optional JSON file for accuracy metrics.")
 flags.DEFINE_boolean(
     "eval_against_brute_force", False, "If true, eval against brute force."
 )
@@ -203,6 +205,7 @@ def train_fn(
     l2_norm_eps: float = 1e-6,
     enable_tf32: bool = False,
     opt_enable_apex: bool = False,
+    metrics_output: str = "",
 ) -> None:
     random.seed(42)
     torch.manual_seed(42)
@@ -258,7 +261,7 @@ def train_fn(
         item_embedding_dim=item_embedding_dim,
     )
 
-    if main_module == "HSTU":
+    if main_module in ("HSTU", "SASRec"):
         assert (
             user_embedding_norm == "l2_norm" or user_embedding_norm == "layer_norm"
         ), f"Not implemented for {user_embedding_norm}"
@@ -489,7 +492,12 @@ def train_fn(
         hr_10 = _avg(eval_dict_all["hr@10"], world_size=world_size)
         hr_50 = _avg(eval_dict_all["hr@50"], world_size=world_size)
         hr_100 = _avg(eval_dict_all["hr@100"], world_size=world_size)
+        hr_200 = _avg(eval_dict_all["hr@200"], world_size=world_size)
         mrr = _avg(eval_dict_all["mrr"], world_size=world_size)
+        if metrics_output:
+            with open(metrics_output, "w") as f:
+                json.dump({"epoch": epoch, "metrics": {k: float(_avg(v, world_size=world_size))
+                    for k, v in eval_dict_all.items() if "eval_time" not in k}}, f, indent=2)
 
         logging.info(
             f"eval @ epoch {epoch} ({eval_iter + 1} iters, {(eval_iter + 1) * eval_batch_size} evaluated) in {time.time() - eval_start_time:.2f}s: "
@@ -511,8 +519,8 @@ def train_fn(
                 f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100},{eval_time_avg_ms:.3f},{eval_time_dev_ms:.3f}"
             )
         else:
-            logging.info("HR@1,HR@5,HR@10,HR@50,HR@100")
-            logging.info(f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100}")
+            logging.info("HR@1,HR@5,HR@10,HR@50,HR@100,HR@200,MRR")
+            logging.info(f"{hr_1},{hr_5},{hr_10},{hr_50},{hr_100},{hr_200},{mrr}")
 
     cleanup()
 
@@ -529,7 +537,9 @@ def mp_train_fn(
     include_eval_time: bool,
     eval_dtype: str,
     eval_against_brute_force: bool,
+    metrics_output: str,
 ) -> None:
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
     if gin_config_file is not None:
         # Hack as absl doesn't support flag parsing inside multiprocessing.
         logging.info(f"Rank {rank}: loading gin config from {gin_config_file}")
@@ -547,6 +557,7 @@ def mp_train_fn(
         include_eval_time=include_eval_time,
         eval_dtype=eval_dtype,
         eval_against_brute_force=eval_against_brute_force,
+        metrics_output=metrics_output,
     )
 
 
@@ -568,6 +579,7 @@ def main(argv):
             FLAGS.include_eval_time,
             FLAGS.eval_dtype,
             FLAGS.eval_against_brute_force,
+            FLAGS.metrics_output,
         ),
         nprocs=world_size,
         join=True,

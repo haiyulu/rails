@@ -1,0 +1,89 @@
+# Parameters for create_data_loader:
+# ==============================================================================
+create_data_loader.num_workers = 8
+create_data_loader.prefetch_factor = 128
+
+# Parameters for create_mol_interaction_module:
+# ==============================================================================
+create_mol_interaction_module.dot_product_dimension = 64
+create_mol_interaction_module.dot_product_l2_norm = True
+create_mol_interaction_module.eps = 1e-06
+create_mol_interaction_module.gating_combination_type = 'glu_silu'
+create_mol_interaction_module.gating_item_dropout_rate = 0.0
+create_mol_interaction_module.gating_item_fn = True
+create_mol_interaction_module.gating_item_hidden_dim = 128
+create_mol_interaction_module.gating_qi_dropout_rate = 0.0
+create_mol_interaction_module.gating_qi_hidden_dim = 128
+create_mol_interaction_module.gating_query_fn = True
+create_mol_interaction_module.gating_query_hidden_dim = 128
+create_mol_interaction_module.item_dot_product_groups = 4
+create_mol_interaction_module.item_dropout_rate = 0.1
+create_mol_interaction_module.item_hidden_dim = -1
+create_mol_interaction_module.item_nonlinearity = 'swiglu'
+create_mol_interaction_module.query_dot_product_groups = 8
+create_mol_interaction_module.query_dropout_rate = 0.0
+create_mol_interaction_module.query_hidden_dim = 512
+create_mol_interaction_module.query_nonlinearity = 'swiglu'
+create_mol_interaction_module.softmax_dropout_rate = 0.2
+create_mol_interaction_module.temperature = 0.05
+create_mol_interaction_module.uid_dropout_rate = 0.5
+create_mol_interaction_module.uid_embedding_hash_sizes = [6040]
+create_mol_interaction_module.uid_embedding_level_dropout = False
+
+# Parameters for get_sequential_encoder:
+# ==============================================================================
+get_sequential_encoder.activation_checkpoint = False
+
+# Parameters for get_similarity_function:
+# ==============================================================================
+get_similarity_function.activation_checkpoint = False
+get_similarity_function.bf16_training = False
+
+# Parameters for sasrec_encoder:
+# ==============================================================================
+sasrec_encoder.ffn_activation_fn = 'relu'
+sasrec_encoder.ffn_dropout_rate = 0.2
+sasrec_encoder.ffn_hidden_dim = 50
+sasrec_encoder.num_blocks = 2
+sasrec_encoder.num_heads = 1
+
+# Parameters for train_fn:
+# ==============================================================================
+train_fn.benchmark_output_dir = \
+    '/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261026-201101/sasrec_mol'
+train_fn.custom_date_str = 'benchmark-20261026-201101'
+train_fn.dataset_name = 'ml-1m'
+train_fn.dropout_rate = 0.2
+train_fn.embedding_module_type = 'local'
+train_fn.enable_tf32 = True
+train_fn.eval_batch_size = 128
+train_fn.eval_bf16 = False
+train_fn.eval_interval = 100
+train_fn.eval_user_max_batch_size = None
+train_fn.full_eval_every_n = 1
+train_fn.gr_output_length = 10
+train_fn.interaction_module_type = 'MoL'
+train_fn.item_embedding_dim = 50
+train_fn.item_l2_norm = False
+train_fn.l2_norm_eps = 1e-06
+train_fn.learning_rate = 0.001
+train_fn.local_batch_size = 128
+train_fn.loss_activation_checkpoint = False
+train_fn.loss_module = 'SampledSoftmaxLoss'
+train_fn.loss_weights = {'mi_loss': 0.001, 'uid_embedding_l2_norm': 0.1}
+train_fn.main_module = 'SASRec'
+train_fn.main_module_bf16 = False
+train_fn.max_sequence_length = 200
+train_fn.num_epochs = 101
+train_fn.num_negatives = 128
+train_fn.num_warmup_steps = 0
+train_fn.partial_eval_num_iters = 32
+train_fn.positional_sampling_ratio = 1.0
+train_fn.random_seed = 42
+train_fn.sampling_strategy = 'local'
+train_fn.save_ckpt_every_n = 1
+train_fn.smoke_steps = 1
+train_fn.temperature = 1.0
+train_fn.top_k_method = 'MoLBruteForceTopK'
+train_fn.user_embedding_norm = 'layer_norm'
+train_fn.weight_decay = 0
