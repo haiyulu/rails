@@ -11,7 +11,18 @@ def _batch_index(index):
 
 
 @dataclass(frozen=True)
-class UserMemory:
+class ModelContext:
+    atoms: torch.Tensor
+    memory_queries: torch.Tensor
+    version: Tuple
+
+    def num_bytes(self):
+        # Atoms are parameter references, already included in model storage.
+        return self.memory_queries.numel() * self.memory_queries.element_size()
+
+
+@dataclass(frozen=True)
+class RawHistoryState:
     keys: torch.Tensor
     values: torch.Tensor
     positions: torch.Tensor
@@ -19,18 +30,16 @@ class UserMemory:
     lengths: torch.Tensor
     selected_indices: torch.Tensor
     selected_mask: torch.Tensor
-    guard_indices: torch.Tensor
-    guard_mask: torch.Tensor
-    summary_u: torch.Tensor
-    summary_z: torch.Tensor
-    summary_scale: torch.Tensor
-    deep_u: torch.Tensor
-    deep_z: torch.Tensor
-    deep_scale: torch.Tensor
-    deep_count: torch.Tensor
-    memory_queries: torch.Tensor
+    recent_indices: torch.Tensor
+    recent_mask: torch.Tensor
     event_payloads: Dict[str, torch.Tensor]
     version: Tuple
+
+
+@dataclass(frozen=True)
+class UserMemory(RawHistoryState):
+    summaries: torch.Tensor
+    summary_mask: torch.Tensor
     encoder_ref: Optional[object] = None
     encoder_version: Optional[Tuple] = None
 
@@ -41,13 +50,13 @@ class UserMemory:
     def index_batch(self, index):
         index = _batch_index(index)
         values = {f.name: getattr(self, f.name)[index] for f in fields(self)
-                  if isinstance(getattr(self, f.name), torch.Tensor) and f.name != "memory_queries"}
+                  if isinstance(getattr(self, f.name), torch.Tensor)}
         values["event_payloads"] = {k: v[index] for k, v in self.event_payloads.items()}
         return replace(self, **values)
 
     def num_bytes(self):
         tensors = [getattr(self, f.name) for f in fields(self)
-                   if isinstance(getattr(self, f.name), torch.Tensor) and f.name != "memory_queries"]
+                   if isinstance(getattr(self, f.name), torch.Tensor)]
         tensors += list(self.event_payloads.values())
         return sum(t.numel() * t.element_size() for t in tensors)
 

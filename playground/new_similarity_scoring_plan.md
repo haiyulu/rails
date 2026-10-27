@@ -1,343 +1,450 @@
-# Implementing expert-conditioned history similarity in RAILS
+# Implementing LCAR (Latent Cross-Attention Retrieval) in RAILS
 
-## Goal and architecture
+## Goal and implementation status
 
-Implement the three innovations in the [model improvement plan](model_idea/retrieval_model_improvement_plan.md) for both SASRec and HSTU. The [architecture SVG](model_idea/retrieval_model_research_idea.svg) illustrates the data flow. This document translates that design into scorer, training, indexing, and benchmark changes.
+Implement **LCAR (Latent Cross-Attention Retrieval)** as specified in [the model improvement plan](model_idea/retrieval_model_improvement_plan.md). Name the backbone variants **LCAR-SASRec** and **LCAR-HSTU**. Approximate an actual ad token's multi-layer history read with reusable virtual candidates, with one concatenated memory and a sequence of actual-ad expert queries.
 
-The objective is to recover useful ranking-style, actual-ad-aware history interaction while preparing user memory independently of candidate ads. Use the existing four SASRec/HSTU + DotProduct/MoL models as baselines. Improved accuracy and acceptable serving cost must be demonstrated experimentally.
+**Naming convention:** the implemented scorer is LCARSimilarity, also exported as LCAR, in rails/similarities/lcar. Factory registration is create_lcar_interaction_module, scorer family is LCAR, and configs are sasrec-lcar.gin/hstu-lcar.gin. Registry/report labels are LCAR-SASRec and LCAR-HSTU. ExpertHistory remains a separate legacy family and is not an alias for the new computation.
 
-| Innovation | Implementation |
+**Adopted revision:** keep one dictionary per item expert for sparse ad coding, appended latent tokens, first-block original-event selection, and final latent summaries. For scoring, concatenate recent originals, one union of originals selected by both experts' activated latents, and all individual activated summaries. The two actual-ad expert query tokens read that single memory through one cross-attention. Pi weights final expert scores only.
+
+**Current repository status:** the appended-latent and joint-memory architecture is implemented as an independent module with parameter-free native-block adapters. Hosts retain their block weights and delegate through small hooks; a standalone API and custom adapter registry also support hosts without those hooks. The [component README](../rails/similarities/lcar/README.md) documents the actual APIs and cache semantics. New correctness checks validate LCAR independently of the legacy version-2 tests. Existing SVG diagrams still depict the earlier design; their update remains separate from code correctness and benchmark execution.
+
+Benchmark execution remains deferred until explicitly requested. The user has confirmed that processing all 1,024 latent tokens per prefix is affordable; do not prune user preparation using a target ad's unknown active support.
+
+| Innovation | Required behavior |
 | --- | --- |
-| **1. Actual-ad history attention** | Preserve event-level history K/V and let the actual item-expert query attend directly to selected events. |
-| **2. Ad-derived latent memory** | Use sparse ad-to-dictionary coefficients to address reusable history selections and summary statistics. Continuous ad-dependent weights mix summaries of the unselected tail. |
-| **3. Item-expert-specific interaction** | Each item expert has its own ad query, codebooks, and history-memory views. Mix expert scores after their independent interactions. |
+| **1. Joint actual-ad memory read** | Preserve recent originals, a cross-expert selected-original union, and individual active summaries as memory tokens; normalize one attention over the whole concatenation per expert query. |
+| **2. Multi-layer virtual-candidate reads** | Append all latents, isolate them with independent-target masks, select originals with first-block attention, and summarize with final latent outputs. |
+| **3. Item experts** | Each expert owns a query and dictionary. Both query tokens read all concatenated memory, including either dictionary's selected evidence. Item-only pi gates the final expert scores. |
 
-Use one shared history encoder and a dense gated mixture of item experts. Each expert has two evidence paths: selected raw events and activation-weighted tail summaries. Here, "raw events" means preserved event-level representations and payloads.
+## 1. Parameters and model computation
 
-The implementation name is `ExpertHistorySimilarity`, registered as `interaction_module_type = "ExpertHistory"`. Scoring returns recommendation logits with shape `[batch, candidates]`.
+### 1.1 Initial budgets and input representations
 
-## 1. Specify the model computation
+| Setting | Value |
+| --- | --- |
+| Item experts E | 2 |
+| Dictionary atoms per expert M | 512 |
+| Total appended latent tokens C_total=E*M | 1,024 |
+| Maximum active latents per ad/expert K_act | 16 |
+| Original events selected per latent b | 16 |
+| Recent original events R | 32 |
+| Sparse coding iterations | 8 |
+| Hidden width d_h | Existing backbone width; 50 in ML-1M |
+| Scorer key/query/value widths | 32 |
+| Backbone blocks / heads | Existing settings: SASRec 2 / 1; HSTU 8 / 2 |
 
-### 1.1 Shared history encoding and item experts
+The native first-block attention dimensions are the backbone's dimensions, not the scorer's width/head count. Preserve the configured SASRec/HSTU architecture and causal event ordering.
 
-For a valid user history prefix:
+Let X be original event embeddings after input preprocessing, before the first sequence block. Keep original positions, IDs, masks, time/action payloads, and chronological order. In current ML-1M preprocessing, X contains scaled item lookup, learned positions, and dropout. Both original-event memory segments use projections of X, never contextualized block outputs. Keep individual tokens until the single joint scorer attention.
+
+Each expert owns one bounded dictionary \(C_e\in\mathbb R^{d\times M}\), whose columns are \(c_{e,j}\). Do not create independent selection and summarization dictionaries. Role-specific learned transformations are allowed; atom identities and routing remain shared.
+
+### 1.2 Item experts and regular sparse coding
+
+For item/ad i:
 
 \[
-H_u=\operatorname{Encoder}(\mathrm{history}_u),\qquad
-k_{u,t}=W_K H_{u,t},\qquad v_{u,t}=W_V H_{u,t},\qquad
-\bar k_{u,t}=k_{u,t}/\sqrt d.
+y_i=\operatorname{ItemEncoder}(\mathrm{features}_i),\qquad
+q_{i,e}=F_e(y_i),\qquad
+\pi_e(i)=\operatorname{softmax}_e(g(y_i)).
 \]
 
-Share these history keys and values across item experts. Retain event positions, item IDs, masks, and available action/time payloads.
-
-For candidate item/ad `i`:
+Reuse the item expert MLPs, normalization, gates, and regular nonnegative L1 coding:
 
 \[
-x_i=\operatorname{ItemEncoder}(\mathrm{features}_i),\qquad
-q_{i,e}=F_e(x_i),\qquad
-\pi_e(i)=\operatorname{softmax}_e(g(x_i)).
+\bar q_{i,e}=q_{i,e}/\max(\|q_{i,e}\|_2,\epsilon),
 \]
-
-Run all `E` item experts. Each query independently reads history before expert scores are combined. For ML-1M, use the current item embedding as the input feature representation; datasets with richer ad features can extend that input later.
-
-### 1.2 Expert-specific sparse coding and memory queries
-
-Give expert `e` one dictionary `C_e = [c[e,1], ..., c[e,M]]` with `M` learned atoms. For coefficient inference, normalize the expert query as `z = q / max(norm(q), eps)`; raw-event attention still uses the actual query `q`. Solve the nonnegative sparse-coding objective approximately:
 
 \[
 \gamma^*_{i,e}=\arg\min_{\gamma\ge0}
-\frac12\|z_{i,e}-C_e\gamma\|_2^2+\lambda\|\gamma\|_1,
+\frac12\|\bar q_{i,e}-C_e\gamma\|_2^2+\lambda\|\gamma\|_1,
 \qquad \|c_{e,j}\|_2\le1.
 \]
 
-Use eight unrolled projected-gradient steps initially, starting at zero:
+Use eight unrolled projected-gradient steps initially:
 
 \[
 \gamma^{(n+1)}
 =\operatorname{ReLU}\left[
-\gamma^{(n)}+\eta_e C_e^\top(z-C_e\gamma^{(n)})-\eta_e\lambda
-\right].
+\gamma^{(n)}+\eta_e C_e^\top(\bar q-C_e\gamma^{(n)})
+-\eta_e\lambda\mathbf1\right],\qquad
+\gamma^{(0)}=0,
 \]
 
-Use the conservative stable step size `eta_e = 0.9 / max(norm(C_e, 'fro')**2, eps)`, refreshed with dictionary weights as model-only preparation. The Frobenius-squared norm upper-bounds the spectral Lipschitz constant and has directly auditable arithmetic costs. The finite-step result is approximate. Retain at most `K_act` largest positive coefficients after inference, giving `gamma_tilde` and support `A(i,e)`. This hard support cap bounds scorer work.
+\[
+\eta_e=0.9/\max(\|C_e\|_F^2,\epsilon),\qquad \lambda=0.01.
+\]
 
-Normalize retained coefficients to obtain continuous summary weights:
+Keep at most K_act largest positive coefficients after inference, producing support \(\mathcal A(i,e)\) and \(\widetilde\gamma\). Normalized retained coefficients may be kept for diagnostics:
 
 \[
 \alpha_{i,e,j}
-=\frac{\widetilde\gamma_{i,e,j}}
-{\sum_{h\in\mathcal A(i,e)}\widetilde\gamma_{i,e,h}},
-\qquad j\in\mathcal A(i,e).
+=\widetilde\gamma_{i,e,j}/
+\sum_{k\in\mathcal A(i,e)}\widetilde\gamma_{i,e,k}.
 \]
 
-When all inferred coefficients are zero, select the atom with the highest query compatibility and give it normalized weight one. Track the fallback and use deterministic ties in evaluation. Pad active-index lists to `K_act` with an explicit mask; fewer than `K_act` positive coefficients are valid.
+For an all-zero code, activate the most compatible atom with normalized weight one, retain the zero pre-fallback coefficients for auxiliary loss, and record the fallback. Keep deterministic evaluation ties. Actual-query attention uses q, not its coding-normalized version. Sparse support selects memory tokens. In this default, alpha does not weight a summary sum, scale tokens, or enter attention logits; changing only alpha at fixed support, queries, and memory must leave scores unchanged.
 
-A memory slot is `s=(e,j)`. Its history query is
+### 1.3 Append all atoms as independent virtual candidates
+
+Use an expert-specific token projection from ad-code width to backbone width:
 
 \[
-a_{e,j}=A_e c_{e,j}+b_e.
+z^{(0)}_{u,e,j}=P_ec_{e,j}+p_{\rm target}(u)
+\in\mathbb R^{d_h}.
 \]
 
-The dictionary represents ad-query structure while the expert-specific projection learns useful history access. Keep the L1 penalty on unnormalized coefficients: normalized nonnegative weights sum to one, so penalizing their L1 norm would not encourage sparsity. Different coefficient values can distinguish ads sharing the same support.
+Keep backbone-compatible input scaling and positional conventions explicit. Every latent occupies the same logical next-candidate position after its user's valid prefix. It is not an additional historical interaction.
 
-### 1.3 User-only preparation
+For HSTU, use the same logical candidate time for all latents in that prefix. Use an available request timestamp or a documented prefix-derived fallback; never read held-out future timestamps. Time and position biases must match a separate single-latent reference.
 
-For every slot, compute
+The logical stream is [X; Z]. All 1,024 tokens run independently of the actual ad. Their initial projected atom bases may be cached per checkpoint, but user-dependent latent states cannot be cached globally as static dictionary K/V.
+
+### 1.4 Independent-target masks and sequence updates
+
+Allowed query-to-key interactions are:
 
 \[
-w_{u,s,t}=\exp(a_s^\top\bar k_{u,t}),\qquad
-S_{u,s}=\operatorname{TopB}_{t}(a_s^\top\bar k_{u,t}),
+\mathcal M=
+\begin{bmatrix}
+\operatorname{Causal}_L & 0\\
+\mathbf1_{C_{\rm total}\times L} & I_{C_{\rm total}}
+\end{bmatrix}.
 \]
 
-where `TopB` retains at most `b` valid event positions. Also store full-history sufficient statistics:
+Every history query reads its causal history. Every latent query reads all valid history and its own current token. All history-to-latent and cross-latent edges are forbidden, including between experts.
+
+Run the existing sequence-block equations on the allowed interactions:
 
 \[
-Z_{u,s}=\sum_{t=1}^{L}w_{u,s,t},\qquad
-U_{u,s}=\sum_{t=1}^{L}w_{u,s,t}v_{u,t}.
+H^{(\ell+1)}=F_\ell^{\rm causal}(H^{(\ell)}),\qquad
+z^{(\ell+1)}_{u,e,j}
+=G_\ell(z^{(\ell)}_{u,e,j},H^{(\ell)}).
 \]
 
-Store the selected event K/V once per user, with slot lists referencing deduplicated storage. Each slot additionally needs a scalar `Z`, a value vector `U`, a numerical scale, and masks. Preparation uses only user history and model parameters.
+History does not become latent-conditioned. The latent token becomes user-history-aware through every block, matching a causal candidate-last ranker's dependency pattern. Changing only the dictionary/token values must not change the history stream when backbone parameters are fixed.
 
-### 1.4 Raw-event attention and strict tail summaries
+A joint masked implementation or equivalent two-stream implementation is acceptable. Both must share native block parameters and reproduce separate single-latent inference. Reuse history Q/K/V and pointwise transforms across latents rather than rerunning a full history encoder for every atom.
 
-For each candidate and expert, form the union of events selected by its active slots:
+**HSTU normalization is part of the semantics.** Choose the history-plus-one-virtual-candidate reference under the established padding policy, then use its position/time biases and length normalization for both history and latent streams. A physical length T+1024 or a latent microbatch size must not silently replace that reference length. A diagonal latent mask alone does not fix length-dependent scaling.
 
-\[
-S_{u,i,e}=\operatorname{Unique}\left(
-\bigcup_{j\in\mathcal A(i,e)}S_{u,(e,j)}
-\right).
-\]
+The implemented HSTU adapter uses the host's fixed padded reference capacity, including reserved output positions. Each virtual candidate occupies logical position L within that capacity; the denominator remains the host capacity regardless of latent count/chunking. Native single-candidate reference checks validate this policy with relative position/time biases.
 
-Deduplicate by event position, preserving repeated item interactions at different times.
+For padded dense batches or HSTU jagged layouts, explicitly track history and latent token identities, offsets, masks, logical positions, and expert/atom IDs. Place latents logically after each user's valid prefix, not after an arbitrary padding boundary with different semantic positions.
 
-**Raw path.** Use the actual expert query on retained events:
+### 1.5 First-block attention supplies raw-event selections
 
-\[
-r^{\rm raw}_{u,i,e}
-=\sum_{t\in S_{u,i,e}}
-\operatorname{softmax}_{t\in S_{u,i,e}}
-(q_{i,e}^{\top}\bar k_{u,t})\,v_{u,t}.
-\]
+Expose the first block's latent-to-history attention coefficients before attention dropout and value aggregation. These coefficients must be shared with the real differentiable latent read, using identical projections, biases, scaling, and masks.
 
-**Tail path.** For every active slot, subtract the entire expert-specific union from the cached statistics:
+Let \(\mathcal W^{(1)}_{u,h,e,j,t}\) denote this coefficient. Initially reduce native attention heads with a parameter-free arithmetic mean:
 
 \[
-Z^{\rm tail}_{u,i,s}=Z_{u,s}
--\sum_{t\in S_{u,i,e}}w_{u,s,t},\qquad
-U^{\rm tail}_{u,i,s}=U_{u,s}
--\sum_{t\in S_{u,i,e}}w_{u,s,t}v_{u,t}.
-\]
-
-Normalize each slot before applying the ad's continuous weights:
-
-\[
-z^{\rm tail}_{u,i,s}=U^{\rm tail}_{u,i,s}/Z^{\rm tail}_{u,i,s},\qquad
-r^{\rm tail}_{u,i,e}
-=\sum_{j\in\mathcal A(i,e)}\alpha_{i,e,j}
-z^{\rm tail}_{u,i,(e,j)}.
-\]
-
-Compute subtraction weights only for the retained event union. The scorer must not scan omitted history. A tail event may contribute to several normalized latent views; mixing those views is intentional.
-
-**Expert scores and final mixture.**
-
-\[
-s_e(u,i)=G_e(q_{i,e},r^{\rm raw}_{u,i,e},r^{\rm tail}_{u,i,e},\mathrm{masks}),
+r^{\rm select}_{u,e,j,t}
+=\frac1{h_1}\sum_{h=1}^{h_1}\mathcal W^{(1)}_{u,h,e,j,t},
 \qquad
+I_{u,e,j}=\operatorname{TopB}_{t\ \mathrm{valid}}r^{\rm select}_{u,e,j,t}.
+\]
+
+For SASRec use native masked softmax coefficients. For HSTU use native pointwise attention coefficients after its score activation and reference scaling; do not replace them with softmax. HSTU coefficients may be negative. Rank by largest reduced coefficient, masking ineligible positions to negative infinity for selection; zero padding must not outrank valid negative coefficients.
+
+Exclude latent self positions, every other latent, and padded history from selection candidates. Use deterministic evaluation ties. Selection uses first-block input history, which is still original X; a pointwise normalization/projection does not make it a contextualized event.
+
+Top-b extraction is a side output of first-block execution. It does not prune history or cause an additional full relevance pass. Keep the full differentiable attention path even though selected indices do not carry ordinary gradients.
+
+Remove the standalone atom-to-selector projection and its memory-query reuse with final pooling. The native first-block latent query/key parameters now learn through final latent summaries. No new selection-only auxiliary objective is required initially.
+
+### 1.6 Final latent representations supply full-history summaries
+
+Run every latent through all D blocks; each layer can read all valid history plus latent self. Then:
+
+\[
+s_{u,e,j}
+=W^{\rm sum}_e\operatorname{OutputPostproc}(z^{(D)}_{u,e,j})
+\in\mathbb R^{d_v}.
+\]
+
+Use the backbone's configured output postprocessing consistently and an expert-specific summary projection into scorer value width. Cache summaries [B,E,M,d_v].
+
+There is no separate final attention-pooling scan over H, no full-history exponential statistics, and no event exclusion from latent reads. Recent and selected events remain accessible in every layer. A summary is the learned virtual-candidate output, not a guaranteed convex combination or lossless representation of history.
+
+For an empty history, mask every memory segment, including final latent summaries, and return zero cross-attention outputs. Latent-only self states must not appear as history evidence.
+
+### 1.7 Preserve recent and selected original memory
+
+From X, keep the latest R valid original positions J_u and all first-block latent selection lists. Deduplicate physical storage by original event position, preserving repeated item interactions at distinct positions.
+
+Project preserved originals to a common memory-token width:
+
+\[
+m^{\rm raw}_{u,t}=P_{\rm raw}x_{u,t}\in\mathbb R^{d_m},
+\qquad d_m=32.
+\]
+
+This projection is separate from the first block's native selection Q/K/V. It can run after original-position packing because it is pointwise. Final summaries already have the same width. The full original history still enters every sequence block; packing affects scorer storage only.
+
+### 1.8 Gather one candidate-specific memory across both experts
+
+Let the active token identities be:
+
+\[
+\mathcal A(i)=\{(e,j):j\in\mathcal A(i,e)\},
+\qquad K_i=|\mathcal A(i)|\le32.
+\]
+
+Build a single selected-event union across all active lists from both experts:
+
+\[
+S_{u,i}=\operatorname{Unique}
+\left(\bigcup_{(e,j)\in\mathcal A(i)}I_{u,e,j}\right),
+\qquad
+U_{u,i}=|S_{u,i}|\le\min(L,E K_{\rm act}b).
+\]
+
+Deduplicate by original event position, preserving repeated item IDs at different positions, and sort the selected union chronologically. Both query experts receive the same union; do not retain expert-specific visibility masks.
+
+Gather three segments without pooling:
+
+\[
+M^{\rm recent}_{u,i}=[m^{\rm raw}_{u,t}]_{t\in J_u},
+\qquad
+M^{\rm selected}_{u,i}=[m^{\rm raw}_{u,t}]_{t\in S_{u,i}},
+\]
+
+\[
+M^{\rm latent}_{u,i}=[s_{u,e,j}]_{(e,j)\in\mathcal A(i)}.
+\]
+
+Keep one separate token per active latent, with stable expert/atom identity and an active mask. There is no alpha-weighted summary sum. Concatenate the token axis:
+
+\[
+\mathcal T_{u,i}
+=\operatorname{Concat}_{\rm tokens}
+[M^{\rm recent}_{u,i};M^{\rm selected}_{u,i};M^{\rm latent}_{u,i}]
+\in\mathbb R^{T_{u,i}\times32},
+\]
+
+\[
+T_{u,i}=R_u+U_{u,i}+K_i,\qquad R_u=\min(R,L).
+\]
+
+Preserve the specified literal concatenation. Deduplicate within the selected union across both experts, while allowing its overlap with the recent segment. A repeated original across these two segments occupies two attention positions; document and test that multiplicity rather than silently removing it. Distinct expert/atom summaries are separate tokens even when their vectors coincide.
+
+Gather/concatenation belongs to per-pair scoring. User preparation stores all lists and summaries without seeing any target. Pad memory to the candidate chunk's maximum T and propagate token masks. With L<=200 and current budgets, U<=200, K<=32, R_u<=32, so T<=264. Across longer histories, use the configured bounds rather than hard-coded 264.
+
+### 1.9 One cross-attention with the expert query sequence
+
+Stack all actual-ad expert queries:
+
+\[
+Q_i=[q_{i,1};q_{i,2}]\in\mathbb R^{2\times32},
+\]
+
+\[
+\widehat Q_i=Q_iW_Q,\qquad
+K_{u,i}=\mathcal T_{u,i}W_K,\qquad
+V_{u,i}=\mathcal T_{u,i}W_V,
+\]
+
+\[
+A_{u,i}
+=\operatorname{softmax}_{\rm memory}
+\left(\widehat Q_iK_{u,i}^\top/\sqrt d+\mathrm{padding\ mask}\right),
+\qquad
+O_{u,i}=A_{u,i}V_{u,i}.
+\]
+
+Start with one scorer attention head. Both expert queries see the entire same concatenation, including summary tokens and selected originals originating from either expert. One softmax per query spans all segments. Do not run independent recent/selected/summary attentions, pool any segment first, or add query-token self-attention.
+
+Default logits contain query-key compatibility plus masks. Neither pi nor alpha biases or scales memory/attention. Pi is reserved for final expert score mixing. Adding a constant log pi_e to query row e would cancel under the memory softmax and is not expert contribution gating.
+
+Common-width token projections and shared scorer K/V projections are learned. Their pointwise nature allows prepare_user to cache K/V for all original and summary tokens, and score_prepared to concatenate gathered K/V with the same result as projecting a concatenated token tensor. In either implementation there is one conceptual shared memory and one joint normalization.
+
+### 1.10 Expert scoring and pi-only final mixture
+
+Each updated query token o_e supplies one expert output, [B,N,E,d_v]. Use:
+
+\[
+v^q_{i,e}=W_{vq}q_{i,e},\qquad
+f^{\rm score}_{u,i,e}
+=[q_{i,e};o_{u,i,e};v^q_{i,e}\odot o_{u,i,e}],
+\]
+
+\[
+s_e(u,i)=\operatorname{MLP}_e(f^{\rm score}_{u,i,e}),\qquad
 s(u,i)=\sum_e\pi_e(i)s_e(u,i).
 \]
 
-Use a small MLP per expert with query/raw/tail features and elementwise query/value products after dimension projection. Keep outputs as unnormalized logits. This combines exact attention on selected events with learned tail evidence; it does not assert equivalence to full-history attention.
+Initially the score head has 96 inputs and layers 96 -> 64 -> 1. Replace the previous 227-input head, three independent pooled vectors, and three path-present score features. Memory masks handle absent segments and all-empty attention safely.
 
-## 2. Add prepared states and extend the encoder/scorer bridge
+Pi is produced from item features, normalized over experts, and applied only after expert scores. At fixed queries/memory, changing pi leaves attention weights, output tokens, and individual expert logits unchanged; it changes only the final weighted score.
 
-The existing `SimilarityModule.forward` receives a rank-2 user tensor and shared or per-user candidate embeddings. `modeling/similarity_module.py` asserts that user-tensor rank. Both backbones already produce event-level states during training, but evaluation currently keeps only the current-user embedding. The new model needs explicit history-memory plumbing.
+Output remains unnormalized logits [B,N]. Joint cross-attention aggregates tokens at the final query read, after individual event and summary information has been preserved up to that point. It is not equality to an actual-ad full-history ranker's multi-layer read.
 
-Add the following scorer-owned interfaces:
+## 2. Encoder/scorer bridge and prepared states
+
+The bridge delegates to LCAR's external encoder runner. It captures originals, performs shared-history/independent-latent native block updates, extracts first-block selections, and projects final latent states. Native SASRec/HSTU details live only in the adapter module; the dictionary, orchestration, memory assembly, and scorer remain backbone-independent.
+
+Implemented standalone API:
 
 ~~~python
-prepare_user(history_states, history_mask, event_payloads) -> UserMemory
-prepare_items(item_embeddings, item_ids, **kwargs) -> ItemState
-score_prepared(user_memory, item_state) -> (scores, auxiliary_losses)
+memory = scorer.prepare_user(backbone, lengths, history_ids, history_embeddings, payloads)
+items = scorer.prepare_items(item_embeddings, item_ids)
+scores, auxiliary_losses = scorer.score_prepared(memory, items)
 ~~~
 
-Define typed states with batch slicing and candidate slicing operations:
+For inspection and cache reuse, encode_history returns EncoderOutput; finish_user_memory consumes that output. A custom adapter can be passed explicitly or registered with register_backbone_adapter. The integrated public encode_with_history still returns a current-user tensor plus UserMemory. Prepared scoring gathers unpooled memory and runs joint attention without rerunning the encoder. Sampled-prefix training prepares all states inside distributed forward.
 
 | State | Required contents |
 | --- | --- |
-| `UserMemory` | Retained event K/V, original positions/IDs and payloads, slot-to-event indices and selection masks, full-history `U/Z`, scales, history/tail masks, model version. |
-| `ItemState` | Candidate IDs, expert queries, active atom indices/masks, sparse coefficients, normalized slot weights, item-only expert gates, candidate layout, model/dictionary version; training-only sparse-coding statistics when requested. |
+| ModelContext | Cached initial token projections in fixed expert/atom order and model version; canonical dictionary parameters remain owned by LCAR. |
+| Original input tensors | Per-forward X, valid mask/lengths, positions, IDs, payloads; transient until packing/encoding complete. |
+| EncoderOutput / HistoryCache | Original/history/final latent states, first-block selected positions/masks, context, shared per-layer history read contexts and cache provenance. Full attention matrices do not persist. |
+| UserMemory | Packed original tokens/payloads, recent references/masks, all latent selected-position lists, all final summary tokens/presence, optional cached joint K/V for both token types, complete provenance/version. |
+| ItemState | IDs, expert query sequence and optional projected queries, active atom indices/masks, coefficients and optional diagnostic alpha, final expert gates pi, layout/version, training sparse-loss statistics. |
 
-Representative tensor axes are `[batch, E, M, b]` for slot selections, `[batch, E, M, d_v]` for `U`, and `[batch, E, M]` for `Z`. Item active indices, weights, and masks use `[1/batch, candidates, E, K_act]`. Retained K/V can be packed or padded with explicit masks.
+Representative tensor axes:
 
-Preserve the public `SimilarityModule.forward(query_embeddings, item_embeddings, **kwargs)` signature. The new scorer requires an explicit `user_memory` keyword and delegates to prepared scoring. Its legacy `query_embeddings` argument is the user-side tensor used for batch alignment; the actual ad queries are produced from item embeddings. Missing user memory is an error. DotProduct and MoL retain their current tensor paths.
+- X / history outputs: [B,T,d_h], mask [B,T].
+- Canonical atoms: [E,M,d]; initial/final latent states: [B,E,M,d_h].
+- First-block latent-history coefficients, if materialized: [B,h_1,E,M,T].
+- Selection references/masks: [B,E,M,b]; recent references/masks [B,R].
+- Packed original tokens: [B,P,d_m], P<=L; optionally cache K/V [B,P,d] / [B,P,d_v].
+- Final summary tokens: [B,E,M,d_m], presence [B,E,M]; optional projected summary K/V.
+- Item active indices/masks: [1/B,N,E,K_act]; query sequence [1/B,N,E,d]; pi [1/B,N,E].
+- Candidate-specific active summaries: [B,N,K_max,d_m]; shared selected union [B,N,U_max].
+- Concatenated memory: [B,N,T_max,d_m], mask [B,N,T_max].
+- Joint attention: [B,N,E,T_max] for one head; outputs [B,N,E,d_v].
+- Expert logits [B,N,E]; final logits [B,N].
 
-Add an explicit history-encoding helper at the model bridge, using each backbone's event-level outputs plus valid positions. Return the current-user tensor and prepared memory together for evaluation. Prepare memory once per request/prefix and pass it to positive/negative scoring and retrieval through explicit arguments; do not hide it in mutable module attributes.
+Capture top-b and discard transient full attention coefficients when possible; do not detach coefficients used for latent value aggregation. Support dense/jagged masks, empty/short prefixes, shared/per-user candidates, user slicing, and candidate chunking.
 
-Use auxiliary payload forwarding through `TopKModule.forward(..., **kwargs)` and `CandidateIndex` for `user_memory`. The wrapper still needs a user tensor for batch dimensions. Extend the payload typing to accept prepared-state objects, and slice memory and user payloads together when evaluation splits user batches. Read training/evaluation kwargs without mutating shared state.
+Maintain one canonical dictionary parameter registration on the scorer. Backbones consume atoms/token tensors through explicit arguments; keep native blocks and token/summary projections registered exactly once. Avoid mutable hidden per-request state, circular module ownership, or detached training caches.
 
-Keep all parameterized pieces registered on the scorer so the optimizer, distributed training, and checkpoints discover them. Build inference caches only in evaluation mode. Training prepared states must remain attached to autograd.
+## 3. Implemented module boundaries
 
-## 3. Implement the components and registration
-
-| Area | Planned changes |
+| Area | Responsibility |
 | --- | --- |
-| `rails/similarities/expert_history/` | Add `ExpertHistorySimilarity`, typed states, sparse coefficient inference, dictionary-to-history queries, memory selection/summaries, two-path attention, item experts, routers, and expert scoring. |
-| `modeling/similarity_utils.py` | Add Gin-configurable `create_expert_history_interaction_module(...)` and the `"ExpertHistory"` factory branch. Include dimensions, experts, dictionary size, active-atom budget, selection budget, coefficient-solver settings, and scorer widths in run metadata. |
-| `modeling/similarity_module.py` and backbone integration | Add event-state preparation/forwarding and explicit user-memory handling while retaining the baseline paths. Account for differing SASRec/HSTU event-state return values. |
-| `train.py` and sampled-softmax integration | Prepare causal-prefix memory, reuse it across candidate scores, and aggregate recommendation/sparse-coding losses correctly. |
-| `rails/indexing/learned_top_k.py` and root indexing integration | Add prepared-state exact chunked retrieval and register `LearnedBruteForceTopK`. |
-| `data/eval.py` and `eval_from_checkpoint.py` | Prepare history memory, slice it with evaluation microbatches, and choose the exact retrieval method by scorer metadata. |
-| Configs and playground scripts | Add the two backbone variants, model tests, staged ablations, explicit benchmark metadata, and prepared-stage compute accounting. |
+| modeling/sequential/sasrec.py and hstu.py | Small optional delegation hooks; existing native blocks/weights and baseline paths remain intact. |
+| rails/similarities/lcar/backbones.py | Parameter-free BackboneAdapter protocol/registry plus native SASRec/HSTU adapters; all backbone-specific attention/projection/bias details live here. |
+| rails/similarities/lcar/encoding.py | Backbone-independent history reuse, latent chunks, first-block selection, final outputs, checkpointing, and history cache provenance. |
+| modeling/similarity_module.py | Coordinate original input, first-block selection, final latent output, packing, sampled-prefix loss, and explicit user memory. |
+| rails/similarities/lcar/similarity_fn.py | Canonical dictionary, token/summary/common-memory projections, candidate preparation, joint attention, 96-input expert heads, and pi-only final gating. |
+| rails/similarities/lcar/states.py | ModelContext, EncoderOutput, HistoryCache, UserMemory, ItemState, and JointMemory with slicing/version/accounting support. |
+| rails/similarities/lcar/sparse_coding.py | Bounded dictionary, unrolled nonnegative sparse inference, support cap, fallback, and differentiable coefficient objective. |
+| modeling/similarity_utils.py and configs | LCAR factory/dispatch plus sasrec-lcar.gin and hstu-lcar.gin; legacy ExpertHistory remains separate. |
+| Training and sampled-softmax | Keep one causal-prefix user preparation inside distributed forward; reuse for candidates and count sparse loss once. |
+| Retrieval and evaluation | Reuse exact chunked scoring with revised preparation, slicing, state versions, and cache dependencies. |
+| playground/test_lcar.py, component README, accounting | Native single-target references, standalone/custom-host integration, full training/retrieval checks, and independent LCAR accounting. SVG refresh remains separate. |
 
-Constructor dimensions must come from configuration and backbone/item embedding dimensions. Use separate configuration and checkpoint namespaces for the new family. The initial pilot follows the modeling plan: `E=2`, `M=32`, `K_act=2`, `b=16`, eight coefficient-inference steps, and one attention head per expert. Treat widths and budgets as configurable experiment parameters.
+Preserve existing DotProduct/MoL construction, parameter paths, training, checkpoints, and retrieval. No unrelated baseline rewrite is needed.
 
-Encoder reset loops may touch scorer parameters. Initialize and constrain dictionary atoms after full model construction, and load complete checkpoints after construction. Persist dictionary atoms, expert-specific projections, expert gates, coefficient-solver settings, and normalization settings. A resume restores the learned dictionary without refitting. Any backbone warm start needs an explicit checked key mapping rather than unrestricted non-strict checkpoint loading.
+## 4. Training and gradient requirements
 
-## 4. Adapt next-item training without future leakage
+Keep sampled-prefix supervision with seeded cuts and no held-out target inputs/timestamps. All latents see only the available prefix; one final-prefix memory cannot supervise earlier cuts. Comparisons must match target exposures, sampled cuts, negatives, and optimizer steps.
 
-The current `train.py` computes states for a sequence and asks `SampledSoftmaxLoss.forward` to flatten all supervised positions into jagged examples. The loss then separately scores positives and negatives; it keeps only the positive call's auxiliary dictionary. These details require deliberate changes.
-
-### Causal-prefix supervision
-
-Introduce an explicit supervision mode, `"sampled_prefix"`. Initially sample one valid next-item cut per training sequence using a seeded generator, build one user memory for that prefix, and supervise the immediate next item. Sample only cuts whose targets belong to the existing training partition; held-out evaluation items remain held out.
-
-Use the current negative sampler, duplicate-positive masking, supervision weights, and sampled-softmax objective. Reuse each prefix's memory for its positive and all negatives.
-
-Retain the existing all-position mode for baselines. For a controlled comparison, also run baseline models with the same sampled-prefix cuts and target exposures. Original all-position baseline reports are historical references, not evidence that isolates the new architecture.
-
-Never reuse a final-prefix memory for earlier positions: global top-b lists and summary sums include future events even if the encoder's individual states are causal. Any all-position extension must implement prefix-aware selections and statistics, with row indexing matching the flattened targets.
-
-### Candidate preparation and auxiliary losses
-
-For each logical prefix batch, sample negatives, assemble positive-plus-negative candidate occurrences, and prepare their item states once. Score them with the shared user memory and split logits for the unchanged sampled-softmax formula. Preserve candidate normalization identically in training and evaluation.
-
-Initialize random unit-norm dictionary atoms and train jointly with the recommendation model. Backpropagate through the unrolled coefficient solver and retained coefficient values; hard support and event-selection indices do not receive ordinary gradients. Project dictionary atom norms into the unit ball after optimizer updates. Recommendation gradients train item experts, memory-query projections, coefficient weights, and expert scorers.
-
-Aggregate the sparse-coding auxiliary objective over positive-plus-negative candidate occurrences once per logical batch:
+Retain positive/negative candidate preparation, duplicate-positive masking, candidate normalization, and sampled-softmax temperature 1.0. Aggregate sparse reconstruction/L1 loss over candidate occurrences and experts once per logical batch. Initially:
 
 \[
-\mathcal L_{\rm sparse}
-=\operatorname{mean}_{i,e}\left[
-\tfrac12\|z_{i,e}-C_e\widetilde\gamma_{i,e}\|_2^2
-+\lambda\|\widetilde\gamma_{i,e}\|_1
-\right].
+\mathcal L=\mathcal L_{\rm rec}+0.1\,
+\operatorname{mean}_{i,e}
+\left[\tfrac12\|\bar q_{i,e}-C_e\widetilde\gamma_{i,e}\|_2^2
++0.01\|\widetilde\gamma_{i,e}\|_1\right].
 \]
 
-Use a named configurable weight for this objective in addition to recommendation loss. Keep the all-zero inferred coefficient vector for its auxiliary loss even when the routing fallback selects one slot. Chunking must preserve the sums/counts and must not duplicate the loss. Evaluation produces no training auxiliary loss. Do not rely on the existing negative-call auxiliary return path, which is currently discarded.
+Project atoms into the unit ball after updates. Sparse-code support and selected-event indices remain hard. Continuous user-side latent attention and scorer joint attention remain differentiable. Retained coefficient magnitudes train through the sparse auxiliary objective; no alpha-weighted recommendation read remains in this default.
 
-Record dictionary initialization, sparse reconstruction/L1 weights, solver steps and step-size rule, zero-code fallbacks, seeded prefix sampling, target exposures, and optimizer steps. Preserve gradient flow through memory statistics, and measure real-batch peak memory before long runs.
+Require recommendation gradients through atom-to-token projections, all latent block updates, native first-layer Q/K/V, final summary projections, dictionary atoms, actual query/common-memory projections, joint cross-attention, item experts, expert score heads, and final pi gates. First-layer selector parameters learn through those latent updates, not through top-b indices. Do not retain a selector-only projection with no differentiable loss path.
 
-## 5. Implement stable tail exclusion and edge cases
+Preserve activation checkpointing without recomputing inconsistent stochastic selections. Selection uses pre-attention-dropout coefficients from the actual first-layer read; dropout still follows the native backbone behavior. Compare parallel and separate latent execution with dropout disabled or in evaluation, rather than expecting random masks to match automatically.
 
-Store a per-slot scale for exponentials and use the same scale for cached statistics and all subtracted event weights. Accumulate summaries with sufficient precision; cancellation can be severe when selected events contain almost all the latent attention mass.
+## 5. Cache dependencies and checkpoint migration
 
-Provide a stable complement representation for each slot: prepare the sum over events outside that slot's own top-b set, then subtract contributions from the additional events in the candidate's union. Its reference equations remain the full-history-minus-union equations above. Rebase the complement scale when needed to retain small positive tail mass; apply it consistently to numerator and denominator. The union always contains the slot's own selection.
+Separate dependencies now that history cannot read latent tokens:
 
-Required behavior:
-
-- Mask padding before selection and attention. Select fewer than `b` events for short prefixes.
-- Deduplicate by original event position and retain IDs, timestamps, and payload alignment.
-- Exclude every event in the expert's union from every active slot's tail.
-- For an empty history, produce finite masked zero raw/tail states.
-- For an empty tail, produce a zero summary and a tail-present mask.
-- Determine actual tail emptiness from event counts/masks; do not discard a nonempty tail solely because subtraction underflowed.
-- Compare cached/subtracted summaries with direct masked calculations in stable precision, including highly concentrated latent weights.
-- Version user memory by history prefix and model/codebook weights. Version item caches by candidate IDs/features, model/codebook weights, dtype, device, and evaluation mode.
-
-## 6. Add exact full-catalog retrieval and checkpoint evaluation
-
-Implement `LearnedBruteForceTopK` as a `TopKModule` adapter with `candidate_chunk_size=256` as the initial default.
-
-Prepare the catalog's `ItemState` once for a fixed evaluation checkpoint. For each user request, encode the history and prepare `UserMemory` once, then score candidate-state chunks and maintain the running exact top-k. The public return order is `(top_k_scores, top_k_ids)` with shape `[batch,k]`, respecting `sorted`. Maintain original catalog-ID alignment.
-
-Register the adapter in `indexing/utils_rails.py`. Pass explicit user memory through the root `CandidateIndex` payloads, retaining the wrapper's oversampled request and seen-item filtering. Test valid catalogs with enough unseen items and document existing wrapper behavior when fewer than k valid items exist.
-
-In `data/eval.py`, replace the vector-only preparation for this scorer with the paired current-user tensor/user-memory result. Slice every memory tensor and user payload consistently with evaluation microbatching. Training-time evaluation, checkpoint evaluation, and any enabled batch retrieval entry point must use this same path.
-
-Replace the hardcoded exact reference in `eval_from_checkpoint.py` with explicit scorer metadata:
-
-| Scorer | Exact method |
+| Cache | Dependencies |
 | --- | --- |
-| DotProduct | `MIPSBruteForceTopK` |
-| MoL | `MoLBruteForceTopK` |
-| ExpertHistory | `LearnedBruteForceTopK` |
+| Shared history layer K/V | Prefix, history embedding/preprocessing, backbone weights, position/time and normalization policy, dtype/device/mode. No dictionary-value dependence when those weights/policies are fixed. |
+| Static initial latent bases | Dictionary and atom-to-token projection weights, dtype/device. User-specific target positions/times remain request dependent. |
+| Latent states, summaries, and selections | Shared history plus dictionary, token projection, native blocks, first-block selection policy, output/summary projections, masks/layout. |
+| Packed original tokens and optional joint K/V | Original features, raw/common-memory projections, and retained positions from recent lists and all-latent selections. Summary K/V also depend on final latent states and summary/joint projections. |
+| ItemState / catalog index | Item IDs/features/embedding weights, item experts/gates, dictionary/coding settings, dtype/device/mode. |
 
-Recommendation-accuracy runs use held-out target IDs, `eval_against_brute_force=false`, and timing disabled. Retrieval-reference checks compare methods for the same scoring function. Exact catalog retrieval means exact ranking of this model's two-path logits, not equivalence to a full-history reference model.
+After the first block, latent Q/K/V are user-dependent; do not treat them as static model-only dictionary projections. Prefix-level history/latent caches may be reused only with matching provenance. An isolated dictionary update must invalidate latent outputs and selections while leaving independent history values unchanged.
 
-Use strict loading for new-model checkpoints and preserve existing baseline checkpoint behavior. Rebuild prepared caches after every weight or codebook change.
+Advance the new checkpoint/prepared-state format to version 3, after current version 2. Record token/common-memory/QKV projections, joint-attention settings, cross-expert union/overlap policy, 96-input expert heads, pi-only final mixing, native-block and summary configuration, target mask/position/time/normalization policies, first-block head reduction, and budgets. Version-2 preconditioning checkpoints are not complete appended-latent checkpoints. Warm starts require an explicit checked key mapping; complete new checkpoints load strictly.
 
-## 7. Add experiment configs and staged comparisons
+## 6. Exact retrieval and configuration
 
-Create `configs/ml-1m/sasrec-expert-history.gin` and `configs/ml-1m/hstu-expert-history.gin`. Start from the corresponding backbone settings and dataset protocol; set the new factory, retrieval method, prefix supervision, sparse-coding controls, expert gates, and sparse-coding loss weights explicitly.
+Reuse LearnedBruteForceTopK with candidate_chunk_size=256 initially. Prepare user memory once, fixed-checkpoint catalog item states once, and score catalog chunks exactly under the joint-memory expert-mixture logits. Preserve IDs, filtering, sorting, output order, user microbatching, and candidate slicing.
 
-Gin wiring:
+Registered scorer-family dispatch is DotProduct -> MIPSBruteForceTopK; MoL -> MoLBruteForceTopK; LCAR -> LearnedBruteForceTopK. LCAR has explicit factory, config, registry, inference adapter, and checkpoint metadata. ExpertHistory remains a separate legacy scorer. Recommendation-accuracy evaluation uses held-out targets, timing disabled, and eval_against_brute_force=false. These settings do not authorize execution now.
+
+Both new ML-1M LCAR configs explicitly set:
 
 ~~~gin
-train_fn.interaction_module_type = "ExpertHistory"
-train_fn.top_k_method = "LearnedBruteForceTopK"
-train_fn.supervision_mode = "sampled_prefix"
-
-create_expert_history_interaction_module.num_item_experts = 2
-create_expert_history_interaction_module.dictionary_size = 32
-create_expert_history_interaction_module.max_active_latents = 2
-create_expert_history_interaction_module.sparse_coding_steps = 8
-create_expert_history_interaction_module.sparse_l1_weight = 0.01
-create_expert_history_interaction_module.events_per_slot = 16
-create_expert_history_interaction_module.attention_heads_per_expert = 1
+create_lcar_interaction_module.num_item_experts = 2
+create_lcar_interaction_module.dictionary_size = 512
+create_lcar_interaction_module.max_active_latents = 16
+create_lcar_interaction_module.events_per_slot = 16
+create_lcar_interaction_module.recent_events = 32
+create_lcar_interaction_module.sparse_coding_steps = 8
+create_lcar_interaction_module.sparse_l1_weight = 0.01
+create_lcar_interaction_module.latent_chunk_size = 128
 ~~~
 
-The existing DotProduct and MoL configs use different score-temperature and auxiliary-loss settings. Configure the new scorer explicitly rather than inheriting those accidentally. Use sampled-softmax temperature `1.0` as the initial setting for the learned logits and record it.
+Joint scorer attention currently uses one head; first-block selection uses the host's native heads. latent_chunk_size bounds temporary preparation storage while still processing every atom. Token/summary/common-memory widths and memory-segment ablations are factory options; mask, target-time/position, native normalization, and final-gating policies are recorded in version-3 extra state. Run names include a compact settings hash; training checkpoints also record the host description and operative Gin configuration.
 
-Preserve ML-1M's sequence limit, split, backbone dimensions, initial batch/negative budget, and evaluation metrics. Use 101 total epochs and seed 42 for the first comparable scheduled run, with target exposures and optimizer steps recorded; reduced supervised positions per epoch must be reported. Retain best and final checkpoints, and separate their metrics because the existing split has no independent validation set. Use separate run directories.
+Keep seed 42, 101 total epochs, existing backbone widths/depths, sequence limit, splits, and initial batch/negative budgets for the first scheduled comparable run. Benchmark schedules remain deferred.
 
-Run staged ablations for each backbone:
+## 7. Numerical behavior and edge cases
 
-1. One item expert with code-selected raw attention.
-2. Add tail summaries; compare equal versus ad-dependent activation weights.
-3. Sweep dictionary size, active-atom budget, and coefficient-inference steps; compare equal and sparse-coefficient weights on identical supports.
-4. Add multiple item experts; compare shared versus expert-specific memory banks.
-5. Compare against a full-history actual-ad-attention reference and compute/parameter-controlled MoL variants.
+- Exclude history padding and every non-self latent key before native attention. Restrict selection to valid history columns.
+- Preserve native SASRec softmax and HSTU pointwise attention semantics; do not label HSTU coefficients as probabilities.
+- Use pre-attention-dropout coefficients and the specified mean across native heads for selection.
+- Preserve deterministic top-b tie behavior, repeated-event positions, chronological recent lists, and original payload alignment.
+- For short prefixes, retain fewer than R or b events with explicit masks.
+- Normalize one scorer attention over every valid concatenated token for each query expert; normalize pi over experts for final scores. Alpha may remain diagnostic but does not enter attention. Summary tokens remain individual projected learned vectors.
+- Empty histories produce all-masked memory and finite zero updated query outputs; do not expose latent-only self tokens as history evidence. Handle a missing segment without normalizing it separately.
+- Deduplicate selected originals across both experts' active lists. Preserve declared recent/selected overlap as separate memory positions; no subtraction or silent cross-segment deduplication is introduced.
+- Independent target position/time and reference normalization must not depend on latent enumeration, count per execution chunk, or batch padding accidents.
 
-Match total selected-event attention, user-memory capacity, backbone settings, and training exposure where the comparison requires it. ML-1M validates mechanics and item-conditioned retrieval; richer ad features require a suitable feature-bearing dataset. Additional seeds establish whether measured gains are consistent.
-
-## 8. Extend benchmark metadata and compute accounting
-
-Update the accuracy and inference benchmark runners to use explicit metadata: model ID, config, scorer family, exact retrieval adapter, supervision mode, preparation adapter, and model/codebook version. Do not identify scorer behavior through name substrings.
-
-Use the existing user/item/scoring boundaries:
+## 8. Compute accounting and future comparisons
 
 | Bucket | Work |
 | --- | --- |
-| **U: user-only** | History encoder, shared K/V, all-slot latent relevance, top-b selection, event packing, summary/complement preparation, scales and masks. |
-| **I: item-only** | Item feature encoding, all expert queries, fixed-step sparse coefficient inference, support selection/normalization, expert gates, and catalog-state materialization. |
-| **S: per user–item pair** | Active-slot gathers, per-expert unions/deduplication, actual-query attention, union exclusion, tail normalization/mixing, expert MLPs, and final gated score. |
+| Model-only | Cacheable initial atom-to-token bases and sparse solver constants, with refresh costs. |
+| U: user-only | Original input, shared history blocks, all latent updates, first-block selection, recent lists, packed original-token projections, final latent-summary projections, and optional common K/V caches for all token types. |
+| I: item-only | Expert query sequence and optional query/value-space projections, sparse inference/support, pi gates, catalog state; alpha diagnostics if retained. |
+| S: per pair | Cross-expert selected union, active summary-token gathers, three-segment concatenation/masks, one joint attention for E queries, expert score heads, and pi-weighted final sum. |
 
-Count code-to-memory-query construction as model-only preparation if cached across requests, with explicit refresh cost after weight changes. Do not hide user preparation inside strict scoring or rebuild item projections in catalog chunks.
+With efficient independent streams, attention interaction work is approximately O(D*(L^2+C_total*L+C_total)*d_a), plus native projection/pointwise work on L+C_total tokens. Selection reuses first-layer attention; its additional work is head reduction/top-b/reference construction. No extra standalone selector matmul or final pooling scan is required.
 
-For `C_total = E*M` slots, user latent preparation scales approximately as `O(C_total*L*(d+d_v))` plus selection/packing overhead and the backbone. Summary storage scales as `O(C_total*(d_v+1))` plus scales, complements, selected indices, and retained K/V.
+A naive dense [T+C_total,T+C_total] backend still pays for masked latent-to-latent regions. Record actual executed arithmetic and memory rather than only the allowed-edge formula. Consider latent chunking with shared per-layer history K/V if needed, preserving exact masks, logical positions, and normalization.
 
-Per-pair work includes roughly `O(sum_e |S_e|*(d+d_v))` raw attention and `O(sum_e K_act*|S_e|*(d+d_v))` union exclusion, plus summary reads and expert scoring. Account for actual union sizes and masks. Item-only sparse inference costs approximately O(E*T*M*d) per candidate for T projected-gradient steps, plus support selection. Cache this result for fixed model/item features. Pair arithmetic is independent of omitted history length; user preparation still depends on it.
+Prepared token storage is approximately O(P*d_m+C_total*(b+d_m)+R), plus masks/metadata. Optional common K/V caches add O((P+C_total)*(d+d_v)). After cached projections, pair attention costs O(E*T_pair*(d+d_v)); otherwise add O(T_pair*d_m*(d+d_v)) K/V projection work. Include routing, gather/concatenation, and expert heads. Here T_pair=R_valid+U+K, U<=min(L,E*K_act*b), K<=E*K_act. At current E=2 budgets there are up to 32 active lists, U<=min(L,512), and T_pair<=264 for ML-1M. Do not claim lower pair cost without measurement.
 
-Report arithmetic FLOPs separately from comparisons, support/event top-k, gathers, sorting/deduplication, and special operations. Keep unknown floating-point operations as failures. Benchmark wall-clock latency and memory because indexing and irregular memory access can dominate despite low arithmetic counts.
+Preserve arithmetic ledger failure on unclassified floating operations; report special functions, top-k, indexing/deduplication, model-only caches, user/item cache bytes, peak memory, and actual union sizes separately. Reconcile prepared-stage totals with the composed model.
 
-Report parameters, user FLOPs, item preparation FLOPs, strict scoring FLOPs/pair, cached/uncached whole-model work, actual catalog latency, user/item cache bytes, dictionary usage, active-atom counts, expert utilization, and peak memory. Reuse the existing inference workload and batch/history/catalog sweeps, recording expert/slot/event budgets and source/config hashes.
+Future ablations: matched-supervision baselines; full-history actual-ad-token reference; recent-only and selected-original paths; individual latent-summary token inclusion; joint attention versus separately pooled evidence; uniform versus learned final pi mixing; native first-layer selection versus controlled alternatives; one versus multiple experts; token/event/recent budgets and latent chunk sizes. No experiments or benchmarks execute as part of this documentation task.
 
-## 9. Validate before full training
+## 9. Correctness requirements before benchmarks
 
-Required checks:
+1. **Independent-target equivalence:** batched all-latent outputs and selected scores match separately appended single-latent references in evaluation, including logical positions/time and HSTU normalization.
+2. **Permutation/count invariance:** permuting or chunking latent tokens only permutes their outputs/lists; adding other independent latents does not change an existing latent's result.
+3. **History independence:** changing only dictionary/token values leaves all history layer outputs/K/V unchanged at fixed backbone/input weights. Perturbing one latent does not affect another latent.
+4. **Raw provenance:** selected lists match top-b of the actual first-block history coefficients; gathered scorer K/V come from X, not block outputs.
+5. **Attention semantics:** verify native head averaging, pre-dropout selection, self/padding exclusion, negative HSTU coefficients, and deterministic ties.
+6. **Full-history access:** every latent can read every valid history event at each block; selected lists never prune sequence processing. Final summaries match projected final latent outputs.
+7. **Gradients:** isolate a final-latent/summary loss with no sparse auxiliary term; check nonzero finite gradients in dictionary/token projection and native first-layer Q/K. Verify end-to-end sampled-prefix DDP and activation checkpointing.
+8. **User-only and causal prefixes:** changing target IDs/queries/codes cannot change prepared memory. Perturb future events/held-out timestamps without affecting earlier-prefix results.
+9. **Joint memory and attention:** verify one event union across both experts, chronological original-position deduplication, individual summary tokens, literal recent/selected overlap, variable-length masks, and one softmax over all segments. Compare both query outputs against direct concatenated-memory attention; ensure either query can read either expert's selected evidence.
+10. **Routing and final gates:** verify bounded atoms, nonnegative coefficients, support cap, deterministic fallback, and sparse loss counted once. Changing alpha alone at fixed support/queries/memory must not change attention or scores. Changing only pi must leave attention, query outputs, and expert logits unchanged while changing their final weighted mixture when logits differ.
+11. **State/checkpoint behavior:** user/candidate slicing, empty/short histories, strict version-3 reload, explicit incompatible-checkpoint rejection, and complete cache dependency invalidation.
+12. **Retrieval/compatibility:** exact chunked top-k matches full joint-memory expert-mixture logits; existing DotProduct/MoL parameter/loading/training/retrieval behavior is preserved.
+13. **Compute:** U/I/S plus model-only preparation reconcile with actual execution, including every latent token and backend masked-square overhead.
 
-1. **Layouts:** shared and per-user candidates, batch/candidate size one, masks, valid IDs/payloads, and logits `[batch,candidates]`.
-2. **User-only boundary:** prepared user memory is unchanged when candidate IDs, queries, codes, or activation weights change.
-3. **Causality:** perturb future events and held-out targets; earlier-prefix memory, selections, summaries, and logits remain unchanged.
-4. **Raw attention:** match direct attention over the same deduplicated selected set and preserve repeated events at distinct positions.
-5. **Tail semantics:** union-subtracted summaries match direct masked full-history sums, including cross-slot selected events, concentrated weights, empty tails, and short histories.
-6. **Activation:** fixed active atom indices with changed continuous coefficients alter the weighted summary when slot summaries differ.
-7. **Sparse coding and experts:** coefficients are nonnegative, support has at most K_act entries, fallback is deterministic, activation weights sum to one, atom norms are bounded, and every expert reads its intended memory. Verify solver gradients and objective behavior for fixed normalized dictionaries.
-8. **Training:** finite real-batch sampled-softmax loss, gradients through relevant history/item/summary/gating parameters, and correctly aggregated sparse-coding reconstruction/L1 losses. Candidate chunking preserves scores, loss weighting, and gradients within tolerance.
-9. **Cache/serialization:** direct and prepared scores agree; batch/candidate slicing, save/reload, codebook state, and cache invalidation work.
-10. **Retrieval:** chunked top-k matches full model scoring with aligned IDs, seen-item filtering, user microbatching, and valid tie handling.
-11. **Compatibility:** existing DotProduct/MoL construction, training mode, checkpoint loading, metrics, and retrieval paths retain their behavior.
-12. **Compute:** prepared-stage totals reconcile with composed forward; U/I/S scaling follows history, expert/codebook, and user–candidate axes.
+Also check that no segment is pooled before cross-attention, scorer attention masks do not isolate memory by expert origin, and the new expert head has 96 rather than 227 inputs. Verify cached tokenwise K/V gathers equal direct projection after concatenation.
 
-Acceptance requires both backbone variants to train, reload, score prepared states consistently, retrieve exactly under the new logits, and have audited accuracy/memory/compute reports. Claim an improvement only when the measured comparisons support it.
+Acceptance requires these checks for both backbone variants before any benchmark claim. Earlier version-2 test results must not be reported as evidence for this appended-latent revision.

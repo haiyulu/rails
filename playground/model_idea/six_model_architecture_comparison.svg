@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="2380" viewBox="0 0 3000 2380" role="img" aria-labelledby="title desc">
+<title id="title">Six architectures · sequence conditioning and scoring</title>
+<desc id="desc">Two rows compare SASRec and HSTU. Dot-product and MoL retain ordinary sequence encoders. Proposed ExpertHistory injects static expert dictionaries inside every block, preserves recent and latent-selected original events, summarizes the full contextual history, and uses three scoring paths per item expert. Shared backbone internals are omitted.</desc>
+<metadata>Proposed architecture, 2026-10-27. Sources: retrieval_model_improvement_plan.md and ../new_similarity_scoring_plan.md. Dimensions describe the design, not a verified implementation. No benchmark executed.</metadata>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#71839a"/></marker>
+<marker id="param-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#8963bf"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#f5f7fb"/>
+<rect x="30" y="190" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<rect x="1030" y="190" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<rect x="2030" y="190" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<rect x="30" y="1250" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<rect x="1030" y="1250" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<rect x="2030" y="1250" width="940" height="1030" rx="18" fill="white" stroke="#d4deeb" stroke-width="1.6"/>
+<path d="M255,470 L255,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,470 L765,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M255,610 L255,720" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,610 L765,720" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M255,805 L255,860 L380,860 L380,900" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,805 L765,860 L640,860 L640,900" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M510,985 L510,1070" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,470 L1255,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,470 L1765,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,610 L1255,680" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,755 L1255,800" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,610 L1765,800" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,880 L1255,905 L1380,905 L1380,930" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,880 L1765,905 L1640,905 L1640,930" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1510,995 L1510,1025" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1510,1085 L1510,1110" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2255,470 L2255,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2765,470 L2765,520" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2070,322 L2042,322 L2042,570 L2070,570" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2950,322 L2962,322 L2962,570 L2950,570" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2070,440 L2055,440 L2055,685 L2205,685 L2205,730" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2055,685 L2500,685 L2500,730" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2255,620 L2255,655 L2805,655 L2805,730" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2510,355 L2510,400 L2477,400 L2477,705 L2500,705 L2500,730" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2205,830 L2205,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,830 L2500,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,830 L2805,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2950,590 L2960,590 L2960,880 L2205,880 L2205,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,880 L2500,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,880 L2805,920" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2205,1020 L2205,1040 L2360,1040 L2360,1065" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,1020 L2500,1065" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,1020 L2805,1040 L2660,1040 L2660,1065" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2510,1130 L2510,1160" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M255,1530 L255,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,1530 L765,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M255,1670 L255,1780" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,1670 L765,1780" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M255,1865 L255,1920 L380,1920 L380,1960" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M765,1865 L765,1920 L640,1920 L640,1960" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M510,2045 L510,2130" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,1530 L1255,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,1530 L1765,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,1670 L1255,1740" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,1815 L1255,1860" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,1670 L1765,1860" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1255,1940 L1255,1965 L1380,1965 L1380,1990" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1765,1940 L1765,1965 L1640,1965 L1640,1990" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1510,2055 L1510,2085" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1510,2145 L1510,2170" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2255,1530 L2255,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2765,1530 L2765,1580" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2070,1382 L2042,1382 L2042,1630 L2070,1630" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2950,1382 L2962,1382 L2962,1630 L2950,1630" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2070,1500 L2055,1500 L2055,1745 L2205,1745 L2205,1790" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2055,1745 L2500,1745 L2500,1790" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2255,1680 L2255,1715 L2805,1715 L2805,1790" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2510,1415 L2510,1460 L2477,1460 L2477,1765 L2500,1765 L2500,1790" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M2205,1890 L2205,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,1890 L2500,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,1890 L2805,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2950,1650 L2960,1650 L2960,1940 L2205,1940 L2205,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,1940 L2500,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,1940 L2805,1980" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2205,2080 L2205,2100 L2360,2100 L2360,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2500,2080 L2500,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2805,2080 L2805,2100 L2660,2100 L2660,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2510,2190 L2510,2220" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="45" y="65" font-size="42" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Six architectures · where the candidate meets user history</text>
+<text x="45" y="112" font-size="25" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Rows change the backbone. Columns change sequence conditioning, preserved evidence, and the scoring function.</text>
+<text x="45" y="153" font-size="23" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">ExpertHistory panels show the proposed revision. Common encoder internals are intentionally omitted.</text>
+<text x="60" y="236" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SASRec</text>
+<text x="60" y="269" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">One vector per side</text>
+<rect x="70" y="290" width="880" height="65" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="510.0" y="329.64" font-size="21" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Ordinary sequence encoder · candidate enters after encoding</text>
+<rect x="70" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="255.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="580" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="765.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="70" y="520" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="255.0" y="573.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">SASRec encoder</text>
+<rect x="580" y="520" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="765.0" y="573.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Item embedding</text>
+<rect x="70" y="720" width="370" height="85" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="255.0" y="770.66" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Final user vector</text>
+<rect x="580" y="720" width="370" height="85" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="765.0" y="770.66" font-size="24" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">One item vector</text>
+<rect x="280" y="900" width="460" height="85" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="510.0" y="951.68" font-size="27" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Dot product</text>
+<rect x="330" y="1070" width="360" height="60" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="510.0" y="1108.16" font-size="24" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="510" y="1175" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">History is compressed before scoring.</text>
+<text x="510" y="1200" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">The candidate reads one user vector.</text>
+<text x="1060" y="236" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SASRec + MoL</text>
+<text x="1060" y="269" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Mixture of vector-component interactions</text>
+<rect x="1070" y="290" width="880" height="65" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1510.0" y="329.64" font-size="21" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Ordinary sequence encoder · candidate enters after encoding</text>
+<rect x="1070" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1255.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="1580" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1765.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="1070" y="520" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1255.0" y="573.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">SASRec encoder</text>
+<rect x="1580" y="520" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1765.0" y="573.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Item embedding</text>
+<rect x="1070" y="680" width="370" height="75" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="1255.0" y="725.66" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Final user vector</text>
+<rect x="1070" y="800" width="370" height="80" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="1255.0" y="832.965" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">8 user components</text>
+<text x="1255.0" y="861.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">includes user-ID component</text>
+<rect x="1580" y="800" width="370" height="80" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1765.0" y="847.48" font-size="22" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">4 item components</text>
+<rect x="1280" y="930" width="460" height="65" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="970.32" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">32 component dot products</text>
+<rect x="1280" y="1025" width="460" height="60" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="1062.82" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Learned gated mixture</text>
+<rect x="1330" y="1110" width="360" height="40" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="1137.82" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="1510" y="1175" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Richer similarity between vector components.</text>
+<text x="1510" y="1200" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">No candidate-dependent event read.</text>
+<text x="2060" y="236" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SASRec + ExpertHistory</text>
+<text x="2060" y="269" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Original detail + latent-aware full-history context</text>
+<rect x="2070" y="290" width="880" height="65" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2510.0" y="329.98" font-size="22" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">STATIC AD DICTIONARIES · 512 learned atoms per expert</text>
+<rect x="2070" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="2255.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="2580" y="410" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="2765.0" y="447.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="2070" y="520" width="370" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2255.0" y="549.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">SASRec + dictionary attention</text>
+<text x="2255.0" y="576.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">inside every block</text>
+<text x="2255.0" y="603.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">All history is contextualized</text>
+<rect x="2580" y="520" width="370" height="100" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="2765.0" y="549.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">2 item experts → 2 queries</text>
+<text x="2765.0" y="576.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Top 16 atoms per expert</text>
+<text x="2765.0" y="603.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Continuous sparse weights</text>
+<rect x="2070" y="730" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2205.0" y="772.63" font-size="22" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Latest R original</text>
+<text x="2205.0" y="802.33" font-size="22" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">history events</text>
+<rect x="2365" y="730" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2500.0" y="758.79" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Latent-selected</text>
+<text x="2500.0" y="787.14" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">original events</text>
+<text x="2500.0" y="815.49" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">16 per latent</text>
+<rect x="2660" y="730" width="290" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2805.0" y="773.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Per-latent full-history</text>
+<text x="2805.0" y="800.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">contextual summaries</text>
+<rect x="2070" y="920" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2205.0" y="962.965" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">1 · Recent-event</text>
+<text x="2205.0" y="991.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">actual-ad attention</text>
+<rect x="2365" y="920" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2500.0" y="962.965" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">2 · Selected-event</text>
+<text x="2500.0" y="991.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">actual-ad attention</text>
+<rect x="2660" y="920" width="290" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2805.0" y="963.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">3 · Activation-weighted</text>
+<text x="2805.0" y="990.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">summary read</text>
+<rect x="2230" y="1065" width="560" height="65" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="2510.0" y="1105.32" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Three-path expert scores → gated sum</text>
+<rect x="2330" y="1160" width="360" height="40" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="2510.0" y="1187.48" font-size="22" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="60" y="1296" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">HSTU</text>
+<text x="60" y="1329" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">One vector per side</text>
+<rect x="70" y="1350" width="880" height="65" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="510.0" y="1389.64" font-size="21" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Ordinary sequence encoder · candidate enters after encoding</text>
+<rect x="70" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="255.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="580" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="765.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="70" y="1580" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="255.0" y="1633.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">HSTU encoder</text>
+<rect x="580" y="1580" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="765.0" y="1633.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Item embedding</text>
+<rect x="70" y="1780" width="370" height="85" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="255.0" y="1830.66" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Final user vector</text>
+<rect x="580" y="1780" width="370" height="85" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="765.0" y="1830.66" font-size="24" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">One item vector</text>
+<rect x="280" y="1960" width="460" height="85" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="510.0" y="2011.68" font-size="27" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Dot product</text>
+<rect x="330" y="2130" width="360" height="60" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="510.0" y="2168.16" font-size="24" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="510" y="2235" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">History is compressed before scoring.</text>
+<text x="510" y="2260" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">The candidate reads one user vector.</text>
+<text x="1060" y="1296" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">HSTU + MoL</text>
+<text x="1060" y="1329" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Mixture of vector-component interactions</text>
+<rect x="1070" y="1350" width="880" height="65" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1510.0" y="1389.64" font-size="21" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Ordinary sequence encoder · candidate enters after encoding</text>
+<rect x="1070" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1255.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="1580" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1765.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="1070" y="1580" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1255.0" y="1633.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">HSTU encoder</text>
+<rect x="1580" y="1580" width="370" height="90" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="1765.0" y="1633.16" font-size="24" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Item embedding</text>
+<rect x="1070" y="1740" width="370" height="75" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="1255.0" y="1785.66" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Final user vector</text>
+<rect x="1070" y="1860" width="370" height="80" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="1255.0" y="1892.9650000000001" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">8 user components</text>
+<text x="1255.0" y="1921.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">includes user-ID component</text>
+<rect x="1580" y="1860" width="370" height="80" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1765.0" y="1907.48" font-size="22" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">4 item components</text>
+<rect x="1280" y="1990" width="460" height="65" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="2030.32" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">32 component dot products</text>
+<rect x="1280" y="2085" width="460" height="60" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="2122.82" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Learned gated mixture</text>
+<rect x="1330" y="2170" width="360" height="40" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="1510.0" y="2197.82" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="1510" y="2235" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Richer similarity between vector components.</text>
+<text x="1510" y="2260" font-size="18" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">No candidate-dependent event read.</text>
+<text x="2060" y="1296" font-size="30" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">HSTU + ExpertHistory</text>
+<text x="2060" y="1329" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Original detail + latent-aware full-history context</text>
+<rect x="2070" y="1350" width="880" height="65" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2510.0" y="1389.98" font-size="22" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">STATIC AD DICTIONARIES · 512 learned atoms per expert</text>
+<rect x="2070" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="2255.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">User history</text>
+<rect x="2580" y="1470" width="370" height="60" rx="12" fill="#f0f3f7" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="2765.0" y="1507.82" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Candidate item</text>
+<rect x="2070" y="1580" width="370" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2255.0" y="1609.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">HSTU + dictionary attention</text>
+<text x="2255.0" y="1636.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">inside every block</text>
+<text x="2255.0" y="1663.8" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">All history is contextualized</text>
+<rect x="2580" y="1580" width="370" height="100" rx="12" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="2765.0" y="1609.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">2 item experts → 2 queries</text>
+<text x="2765.0" y="1636.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Top 16 atoms per expert</text>
+<text x="2765.0" y="1663.8" font-size="20" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Continuous sparse weights</text>
+<rect x="2070" y="1790" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2205.0" y="1832.63" font-size="22" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Latest R original</text>
+<text x="2205.0" y="1862.3300000000002" font-size="22" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">history events</text>
+<rect x="2365" y="1790" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2500.0" y="1818.7900000000002" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Latent-selected</text>
+<text x="2500.0" y="1847.14" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">original events</text>
+<text x="2500.0" y="1875.4900000000002" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">16 per latent</text>
+<rect x="2660" y="1790" width="290" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2805.0" y="1833.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">Per-latent full-history</text>
+<text x="2805.0" y="1860.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="middle">contextual summaries</text>
+<rect x="2070" y="1980" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2205.0" y="2022.9650000000001" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">1 · Recent-event</text>
+<text x="2205.0" y="2051.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">actual-ad attention</text>
+<rect x="2365" y="1980" width="270" height="100" rx="12" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="2500.0" y="2022.9650000000001" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">2 · Selected-event</text>
+<text x="2500.0" y="2051.315" font-size="21" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">actual-ad attention</text>
+<rect x="2660" y="1980" width="290" height="100" rx="12" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="2805.0" y="2023.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">3 · Activation-weighted</text>
+<text x="2805.0" y="2050.3" font-size="20" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">summary read</text>
+<rect x="2230" y="2125" width="560" height="65" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="2510.0" y="2165.32" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Three-path expert scores → gated sum</text>
+<rect x="2330" y="2220" width="360" height="40" rx="12" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="2510.0" y="2247.48" font-size="22" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="middle">Final score</text>
+<text x="45" y="2320" font-size="22" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">GRAY: common components   BLUE: original user evidence   ORANGE: item preparation   PURPLE: latent conditioning / summaries   GREEN: scoring</text>
+<text x="45" y="2356" font-size="22" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">ExpertHistory: R = 32 proposed; selected events may overlap recent events. Each latent summary includes the entire contextualized prefix.</text>
+</svg>

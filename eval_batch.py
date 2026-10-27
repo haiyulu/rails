@@ -135,11 +135,11 @@ def run_eval(dataset: str, algorithm: str, batch_size: int, config_file=None, ch
 
 def eval(dataset: str, batch_size: int, scorer_type="MoL", config_file=None, checkpoint=None) -> List[str]:
     eval_data = []
-    exact = {"DotProduct": "MIPSBruteForceTopK", "ExpertHistory": "LearnedBruteForceTopK"}
-    if scorer_type not in ("DotProduct", "MoL", "ExpertHistory"):
+    exact = {"DotProduct": "MIPSBruteForceTopK", "ExpertHistory": "LearnedBruteForceTopK", "LCAR": "LearnedBruteForceTopK"}
+    if scorer_type not in ("DotProduct", "MoL", "ExpertHistory", "LCAR"):
         raise ValueError(f"Unknown scorer type {scorer_type}")
-    if scorer_type == "ExpertHistory" and (config_file is None or checkpoint is None):
-        raise ValueError("ExpertHistory evaluation requires its config and checkpoint")
+    if scorer_type in ("ExpertHistory","LCAR") and (config_file is None or checkpoint is None):
+        raise ValueError(f"{scorer_type} evaluation requires its config and checkpoint")
     algorithms = ([exact[scorer_type]] if scorer_type in exact
                   else configured_algorithms.get(dataset, default_algorithms))
     for algorithm in algorithms:
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", choices=list(configs), default="ml-20m")
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--scorer", choices=("DotProduct", "MoL", "ExpertHistory"), default="MoL")
+    parser.add_argument("--scorer", choices=("DotProduct", "MoL", "ExpertHistory", "LCAR"), default="MoL")
     parser.add_argument("--config")
     parser.add_argument("--checkpoint")
     args = parser.parse_args()

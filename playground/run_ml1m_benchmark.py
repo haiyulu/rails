@@ -19,7 +19,7 @@ from dataclasses import asdict
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from playground.model_registry import ABLATIONS, MODEL_SPECS, MODELS, LABELS
+from playground.model_registry import ABLATIONS, LCAR_ABLATIONS, MODEL_SPECS, MODELS, LABELS, DEFAULT_MODELS
 METRICS = ["hr@1", "hr@10", "hr@50", "hr@200", "mrr"]
 EXTRA_METRICS = ["ndcg@10", "ndcg@50"]
 TARGETS = {
@@ -130,7 +130,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--report-only", action="store_true")
-    parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(MODELS))
+    parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(DEFAULT_MODELS))
     parser.add_argument("--supervision-mode", choices=("auto", "all_positions", "sampled_prefix"), default="auto")
     parser.add_argument("--ablation", choices=list(ABLATIONS), default="full")
     args = parser.parse_args()
@@ -174,11 +174,15 @@ def main():
                 'create_data_loader.persistent_workers = True\n')
             extra = ""
             if args.supervision_mode != "auto":
-                if MODEL_SPECS[model].scorer == "ExpertHistory" and args.supervision_mode != "sampled_prefix":
-                    raise ValueError("ExpertHistory requires sampled_prefix supervision")
+                if MODEL_SPECS[model].scorer in ("ExpertHistory","LCAR") and args.supervision_mode != "sampled_prefix":
+                    raise ValueError(f"{MODEL_SPECS[model].scorer} requires sampled_prefix supervision")
                 extra += f'train_fn.supervision_mode = "{args.supervision_mode}"\n'
             if MODEL_SPECS[model].scorer == "ExpertHistory":
                 extra += ABLATIONS[args.ablation]
+            elif MODEL_SPECS[model].scorer == "LCAR":
+                if args.ablation not in LCAR_ABLATIONS:
+                    raise ValueError(f"Ablation {args.ablation} does not apply to LCAR")
+                extra += LCAR_ABLATIONS[args.ablation]
             config.write_text(config.read_text() + extra)
             configs[model] = config
             smoke = model_dir / "smoke.gin"

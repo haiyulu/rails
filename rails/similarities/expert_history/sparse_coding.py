@@ -34,7 +34,8 @@ class NonnegativeSparseCoding(nn.Module):
     def step_size(self):
         key = (self.dictionary._version, self.dictionary.device, self.dictionary.dtype)
         if self._step_cache is None or self._step_cache[0] != key:
-            with torch.no_grad():
+            # A cached step is reused after eval -> train; keep it a normal tensor.
+            with torch.inference_mode(False), torch.no_grad():
                 # Frobenius squared upper-bounds the spectral Lipschitz constant.
                 # It is deterministic, cheap, and has auditable arithmetic costs.
                 norm = self.dictionary.float().square().sum(dim=(-2, -1))

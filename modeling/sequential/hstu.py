@@ -35,6 +35,7 @@ from modeling.sequential.input_features_preprocessors import (
 from modeling.sequential.output_postprocessors import OutputPostprocessorModule
 from modeling.sequential.utils import get_current_embeddings
 from modeling.similarity_module import SequentialEncoderWithLearnedSimilarityModule
+from modeling.sequential.latent_attention import VersionedHistoryCache
 
 
 TIMESTAMPS_KEY = "timestamps"
@@ -456,6 +457,8 @@ class HSTUJagged(torch.nn.Module):
         delta_x_offsets: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         cache: Optional[List[HSTUCacheState]] = None,
         return_cache_states: bool = False,
+        dictionary_atoms=None,
+        history_adapters=None,
     ) -> Tuple[torch.Tensor, List[HSTUCacheState]]:
         """
         Args:
@@ -476,6 +479,12 @@ class HSTUJagged(torch.nn.Module):
             dtype=self._autocast_dtype or torch.float16,
         ):
             for i, layer in enumerate(self._attention_layers):
+                if history_adapters:
+                    if delta_x_offsets is None:
+                        x = history_adapters[i](x, dictionary_atoms)
+                    else:
+                        changed = delta_x_offsets[0]
+                        x = x.index_copy(0, changed, history_adapters[i](x[changed], dictionary_atoms))
                 x, cache_states_i = layer(
                     x=x,
                     x_offsets=x_offsets,
@@ -499,6 +508,8 @@ class HSTUJagged(torch.nn.Module):
         delta_x_offsets: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         cache: Optional[List[HSTUCacheState]] = None,
         return_cache_states: bool = False,
+        dictionary_atoms=None,
+        history_adapters=None,
     ) -> Tuple[torch.Tensor, List[HSTUCacheState]]:
         """
         Args:
@@ -520,6 +531,8 @@ class HSTUJagged(torch.nn.Module):
             delta_x_offsets=delta_x_offsets,
             cache=cache,
             return_cache_states=return_cache_states,
+            dictionary_atoms=dictionary_atoms,
+            history_adapters=history_adapters,
         )
         y = torch.ops.fbgemm.jagged_to_padded_dense(
             values=jagged_x,
@@ -628,6 +641,7 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
         )
         self._verbose: bool = verbose
         self.reset_params()
+        self.initialize_history_adapters(num_blocks, embedding_dim)
 
     def reset_params(self):
         for name, params in self.named_parameters():
@@ -671,10 +685,16 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
         delta_x_offsets: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         cache: Optional[List[HSTUCacheState]] = None,
         return_cache_states: bool = False,
+        return_history: bool = False,
     ) -> Tuple[torch.Tensor, List[HSTUCacheState]]:
         """
         [B, N] -> [B, N, D].
         """
+        if getattr(self._ndp_module,'uses_appended_latents',False):
+            encoded=self._ndp_module.encode_history(self,past_lengths,past_ids,past_embeddings,
+                                                     past_payloads,history_cache=cache)
+            result=(encoded.history_states,encoded.history_cache if return_cache_states else [])
+            return (*result,encoded,encoded.context) if return_history else result
         device = past_lengths.device
         float_dtype = past_embeddings.dtype
         B, N, _ = past_embeddings.size()
@@ -685,6 +705,19 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
             past_embeddings=past_embeddings,
             past_payloads=past_payloads,
         )
+
+        context = self.prepare_history_context()
+        if context is not None:
+            if cache is not None and (not isinstance(cache, VersionedHistoryCache)
+                                      or cache.version != self.history_version()):
+                raise ValueError("Stale or unversioned history cache; rebuild after dictionary/encoder changes")
+            if return_history and delta_x_offsets is not None:
+                raise ValueError("Prepared history memory requires a complete causal prefix")
+            valid = ((torch.arange(N, device=device)[None, :] < past_lengths[:, None])
+                     & (past_ids != 0))
+            user_embeddings = user_embeddings * valid.unsqueeze(-1)
+        raw = self.prepare_original_history(user_embeddings, past_lengths, past_ids, past_payloads,
+                                             context) if return_history else None
 
         float_dtype = user_embeddings.dtype
         user_embeddings, cached_states = self._hstu(
@@ -699,8 +732,13 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
             delta_x_offsets=delta_x_offsets,
             cache=cache,
             return_cache_states=return_cache_states,
+            dictionary_atoms=context.atoms if context is not None else None,
+            history_adapters=self._history_adapters,
         )
-        return self._output_postproc(user_embeddings), cached_states
+        if context is not None and return_cache_states:
+            cached_states = VersionedHistoryCache(cached_states, self.history_version())
+        states = self._output_postproc(user_embeddings)
+        return (states, cached_states, raw, context) if return_history else (states, cached_states)
 
     def forward(
         self,
@@ -712,6 +750,7 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
         sampled_targets=None,
         negatives_sampler=None,
         sampled_loss=None,
+        return_history: bool = False,
     ) -> torch.Tensor:
         """
         Runs the main encoder.
@@ -727,16 +766,17 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
         Returns:
             encoded_embeddings of [B, N, D].
         """
-        encoded_embeddings, _ = self.generate_user_embeddings(
+        encoded_embeddings, _, raw, context = self.generate_user_embeddings(
             past_lengths=past_lengths,
             past_ids=past_ids,
             past_embeddings=past_embeddings,
             past_payloads=past_payloads,
+            return_history=True,
         )
         if sampled_targets is not None:
             return self.sampled_prefix_loss(encoded_embeddings, past_lengths, past_ids, past_payloads,
-                                            sampled_targets, negatives_sampler, sampled_loss)
-        return encoded_embeddings
+                                            sampled_targets, negatives_sampler, sampled_loss, raw, context)
+        return (encoded_embeddings, raw, context) if return_history else encoded_embeddings
 
     def _encode(
         self,

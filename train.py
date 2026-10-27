@@ -154,8 +154,8 @@ def train_fn(
 ) -> None:
     if supervision_mode not in ("all_positions", "sampled_prefix"):
         raise ValueError(f"Unknown supervision_mode {supervision_mode}")
-    if interaction_module_type == "ExpertHistory" and supervision_mode != "sampled_prefix":
-        raise ValueError("ExpertHistory training requires sampled_prefix supervision")
+    if interaction_module_type in ("ExpertHistory","LCAR") and supervision_mode != "sampled_prefix":
+        raise ValueError(f"{interaction_module_type} training requires sampled_prefix supervision")
     if supervision_mode == "sampled_prefix" and loss_module != "SampledSoftmaxLoss":
         raise ValueError("sampled_prefix requires SampledSoftmaxLoss")
     # to enable more deterministic results.
@@ -300,6 +300,10 @@ def train_fn(
     model = model.to(device)
     ar_loss = ar_loss.to(device)
     negatives_sampler = negatives_sampler.to(device)
+    checkpoint_architecture=({"model_name":f"LCAR-{main_module}","backbone":model_debug_str,
+                              "scorer":interaction_module.get_extra_state(),
+                              "operative_config":gin.operative_config_str()}
+                             if interaction_module_type=="LCAR" else {})
     model = DDP(model, device_ids=[rank], broadcast_buffers=False,
                 find_unused_parameters=supervision_mode == "sampled_prefix")
 
@@ -616,7 +620,8 @@ def train_fn(
                 "optimizer_state_dict": opt.state_dict(),
                 "metrics": metrics,
                 "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
-                                      "target_exposures": target_exposures, "optimizer_steps": batch_id},
+                                      "target_exposures": target_exposures, "optimizer_steps": batch_id,
+                                      **({"architecture":checkpoint_architecture} if checkpoint_architecture else {})},
                 "best_hr10": max(best_hr10, metrics["hr@10"]),
             }
             torch.save(state, os.path.join(benchmark_output_dir, "last.pt"))
@@ -638,7 +643,8 @@ def train_fn(
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": opt.state_dict(),
                     "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
-                                          "target_exposures": target_exposures, "optimizer_steps": batch_id},
+                                          "target_exposures": target_exposures, "optimizer_steps": batch_id,
+                                          **({"architecture":checkpoint_architecture} if checkpoint_architecture else {})},
                 },
                 f"./ckpts/{model_desc}_ep{epoch}",
             )
@@ -665,7 +671,8 @@ def train_fn(
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
                 "training_metadata": {"supervision_mode": supervision_mode, "seed": random_seed,
-                                      "target_exposures": target_exposures, "optimizer_steps": batch_id},
+                                      "target_exposures": target_exposures, "optimizer_steps": batch_id,
+                                      **({"architecture":checkpoint_architecture} if checkpoint_architecture else {})},
             },
             f"./ckpts/{model_desc}_ep{epoch}",
         )

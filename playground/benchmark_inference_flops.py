@@ -148,14 +148,15 @@ class ExpertHistoryInference(SplitInference):
         self.candidate_chunk_size = candidate_chunk_size
         self.FORBIDDEN = self.FORBIDDEN + tuple(
             name for name, _ in model.named_modules()
-            if name.startswith(("_ndp_module.history_key", "_ndp_module.history_value",
+            if name.startswith(("_ndp_module.raw_key", "_ndp_module.raw_value",
+                                "_ndp_module.context_key", "_ndp_module.context_value", "_history_adapters.",
                                 "_ndp_module.item_experts.", "_ndp_module.memory_projections.",
                                 "_ndp_module.value_query", "_ndp_module.expert_gate",
                                 "_ndp_module.sparse_coder")))
 
     def prepare_model(self):
         self.calls["model.prepare"] += 1
-        return self.model._ndp_module.prepare_model()
+        return self.model.prepare_history_context()
 
     def prepare_user(self, fixture):
         self.calls["history.encode"] += 1
@@ -187,6 +188,16 @@ class ExpertHistoryInference(SplitInference):
             embedding[start:start + self.candidate_chunk_size].unsqueeze(0),
             user_memory=user["memory"])[0]
             for start in range(0, ids.numel(), self.candidate_chunk_size)], dim=1)
+
+
+class LCARInference(ExpertHistoryInference):
+    """Prepared-state accounting for the independent LCAR module; never runs on import."""
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.FORBIDDEN=self.FORBIDDEN+tuple(name for name,_ in self.model.named_modules()
+            if name.startswith(('_ndp_module.token_projections.','_ndp_module.summary_projections.',
+                                '_ndp_module.raw_projection','_ndp_module.memory_key',
+                                '_ndp_module.memory_value','_ndp_module.query_projection')))
 
 
 def fixture(catalog, batch, length):
@@ -273,7 +284,7 @@ def make_report(output, results, catalog_size):
     lines += ["", "Cached entire model = user + strict scoring. Uncached entire model additionally prepares the shared catalog once.",
         "Query/component projections and query-only gates are charged to the user. Candidate projections and item-only gates are charged to candidate preparation.",
         "Sorting, support selection, comparisons, and gathers are reported separately from floating arithmetic.",
-        "ExpertHistory includes tail exclusion and memory construction; model-only preparation is recorded in the manifest.", "",
+        "LCAR includes shared native history blocks, independent latent reads, first-block selection, and joint scoring. Legacy ExpertHistory uses preconditioning. Model-only preparation is recorded separately.", "",
         f"## Ratios versus {LABELS[baseline['model']]}", "",
         "| Model | User arithmetic | Strict scoring/pair | Entire cached | Entire uncached |",
         "|---|---:|---:|---:|---:|"]
@@ -340,10 +351,14 @@ def main():
         "source_sha256": {str(p.relative_to(ROOT)): sha(p) for p in
             [Path(__file__).resolve(), ROOT / "playground/inference_flops_counter.py",
              ROOT / "modeling/sequential/sasrec.py", ROOT / "modeling/sequential/hstu.py",
+             ROOT / "modeling/sequential/latent_attention.py", ROOT / "modeling/similarity_module.py",
              ROOT / "rails/similarities/mol/similarity_fn.py", ROOT / "modeling/similarity_utils.py",
              ROOT / "rails/similarities/expert_history/similarity_fn.py",
              ROOT / "rails/similarities/expert_history/sparse_coding.py",
              ROOT / "rails/similarities/expert_history/states.py", ROOT / "playground/model_registry.py"]}}
+    for name in ('__init__.py','backbones.py','encoding.py','similarity_fn.py','sparse_coding.py','states.py'):
+        source=ROOT/'rails/similarities/lcar'/name
+        manifest['source_sha256'][str(source.relative_to(ROOT))]=sha(source)
     dump(output / "manifest.json", manifest)
     (output / "requirements.lock.txt").write_text(subprocess.check_output(
         ["uv", "pip", "freeze", "--python", sys.executable], text=True))
@@ -356,14 +371,17 @@ def main():
                     model, provenance = load_model(model_name, args.checkpoint_root, dataset)
                 manifest["models"][model_name] = provenance
                 spec = MODEL_SPECS[model_name]
-                adapter = (ExpertHistoryInference(model, gin.query_parameter("train_fn.item_l2_norm"),
+                prepared_adapter=LCARInference if spec.inference_adapter=='lcar' else ExpertHistoryInference
+                adapter = (prepared_adapter(model, gin.query_parameter("train_fn.item_l2_norm"),
                                                    gin.query_parameter("train_fn.l2_norm_eps"))
-                           if spec.inference_adapter == "expert_history"
+                           if spec.inference_adapter in ("expert_history","lcar")
                            else SplitInference(model, spec.inference_adapter == "mol"))
                 if isinstance(adapter, ExpertHistoryInference):
                     model_state, model_ledger, _ = counted(adapter, adapter.prepare_model, "model_only")
                     manifest["models"][model_name]["model_only_preparation"] = model_ledger.totals()
-                    manifest["models"][model_name]["model_only_cache_bytes"] = model_state.numel() * model_state.element_size()
+                    manifest["models"][model_name]["model_only_cache_bytes"] = (
+                        model_state.num_bytes() + sum(layer.cache_num_bytes() for layer in model._history_adapters))
+                    manifest["models"][model_name]["architecture"] = model._ndp_module.get_extra_state()
                 manifest["models"][model_name].update(
                     scorer=spec.scorer, exact_top_k=spec.exact_top_k,
                     inference_adapter=spec.inference_adapter,
@@ -444,10 +462,10 @@ def main():
                     if (first["B"], first["L"]) == (second["B"], second["L"]):
                         assert first["user"] == second["user"]
                     assert first["items"]["arithmetic_flops"] * second["N"] == second["items"]["arithmetic_flops"] * first["N"]
-                    if MODEL_SPECS[first["model"]].scorer != "ExpertHistory":
+                    if MODEL_SPECS[first["model"]].scorer not in ("ExpertHistory","LCAR"):
                         assert first["scoring"]["arithmetic_flops"] * second["B"] * second["N"] == second["scoring"]["arithmetic_flops"] * first["B"] * first["N"]
                 if (MODEL_SPECS[first["model"]].scorer == MODEL_SPECS[second["model"]].scorer
-                    and MODEL_SPECS[first["model"]].scorer != "ExpertHistory"
+                    and MODEL_SPECS[first["model"]].scorer not in ("ExpertHistory","LCAR")
                     and (first["B"], first["N"]) == (second["B"], second["N"])):
                     assert first["scoring"] == second["scoring"]
         dump(output / "operation_ledger.json", ledgers)

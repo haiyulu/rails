@@ -20,8 +20,8 @@ class ArithmeticLedger(TorchDispatchMode):
     """Count each dispatched operation once, with explicit fused-op formulas."""
 
     ZERO = set("alias view reshape _unsafe_view as_strided permute transpose t numpy_T slice select expand "
-        "unsqueeze squeeze clone copy_ detach detach_ split split_with_sizes unbind cat stack "
-        "repeat repeat_interleave gather scatter scatter_ index index_select index_copy_ embedding "
+        "unsqueeze squeeze clone copy_ detach detach_ split split_with_sizes chunk unbind cat stack "
+        "repeat repeat_interleave gather scatter scatter_ index index_select index_copy index_copy_ embedding "
         "empty empty_like empty_strided new_empty new_zeros new_full zeros zeros_like ones ones_like "
         "full full_like fill_ zero_ _to_copy to lift_fresh lift_fresh_copy _local_scalar_dense "
         "pad constant_pad_nd slice_scatter masked_fill masked_fill_ where gt ge lt le eq ne "

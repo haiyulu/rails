@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="2860" viewBox="0 0 2400 2860" role="img" aria-labelledby="title desc">
+<title id="title">HSTU ExpertHistory · three-path model graph</title>
+<desc id="desc">Proposed three-path ExpertHistory. Latents select original events before the encoder, participate inside every full-history SASRec/HSTU block, and summarize all contextualized events. Item experts perform recent-event attention, selected-original-event attention, and activation-weighted full-history summary reads. No target ad enters user preparation.</desc>
+<metadata>Proposed architecture, 2026-10-27. Sources: retrieval_model_improvement_plan.md and ../new_similarity_scoring_plan.md. Dimensions describe the design, not a verified implementation. No benchmark executed.</metadata>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#71839a"/></marker>
+<marker id="param-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#8963bf"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#f5f7fb"/>
+<rect x="60" y="350" width="1380" height="1510" rx="18" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<rect x="1480" y="350" width="860" height="1510" rx="18" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<rect x="770" y="710" width="640" height="540" rx="18" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<rect x="60" y="1920" width="2280" height="825" rx="18" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<path d="M750,505 L750,550" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M400,655 L400,710" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,820 L390,865" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M690,765 L725,765 L725,1115 L690,1115" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M90,942 L78,942 L78,1365 L90,1365" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,1170 L390,1280" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,655 L1090,775" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,945 L1090,1020" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1250 L1090,1300" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1400 L1090,1445" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,1460 L390,1480 L720,1480 L720,1640 L390,1640 L390,1670" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1595 L1090,1670" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,505 L1910,550" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,650 L1910,710" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,835 L1910,890" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,1070 L1910,1110" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2310,600 L2325,600 L2325,1380 L2310,1380" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1455,305 L1455,680 L720,680 L720,942 L690,942" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,850 L1380,850" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,1520 L1410,1520" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,975 L1510,975" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M750,1810 L750,1890 L600,1890 L600,1985" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2310,1275 L2330,1275 L2330,1890 L1850,1890 L1850,1985" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M440,2070 L440,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2070 L1200,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1960,2070 L1960,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M440,2340 L440,2385 L780,2385 L780,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2340 L1200,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1960,2340 L1960,2385 L1620,2385 L1620,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2560 L1200,2620" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="60" y="62" font-size="40" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">HSTU ExpertHistory · three-path model graph</text>
+<text x="60" y="104" font-size="24" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">PROPOSED REVISION · pre-block raw selection + latent-aware sequence blocks + full-history summaries</text>
+<text x="60" y="142" font-size="22" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">2 item experts  ·  512 latents / expert  ·  up to 16 active latents / expert  ·  16 selected events / latent  ·  recent R = 32 proposed</text>
+<rect x="60" y="175" width="2280" height="130" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="82" y="209" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SHARED AD-DERIVED PARAMETERS · one canonical dictionary</text>
+<text x="82" y="245" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">C: [2,512,32]   C_all: [1024,32]   shared selection / summary queries a: [2,512,32]</text>
+<text x="82" y="275" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Same atoms feed sparse ad coding, original-event selectors, inside-block adapters, and contextual summary queries.</text>
+<text x="84" y="386" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">USER-ONLY PREPARATION · once per causal history prefix</text>
+<text x="1504" y="386" font-size="24" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">ITEM-ONLY PREPARATION</text>
+<rect x="90" y="405" width="1320" height="100" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="439" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">INPUT · history IDs, valid-event mask, time / action payloads</text>
+<text x="112" y="475" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">IDs / mask: [B,T]     lengths: [B]     valid events: L ≤ 200</text>
+<rect x="90" y="550" width="1320" height="105" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="584" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Original event embeddings X · capture before any sequence block or dictionary adapter</text>
+<text x="112" y="620" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">X: [B,T,50]     shared item lookup + configured position / event features</text>
+<rect x="90" y="710" width="600" height="110" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="744" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Original-event K/V projections</text>
+<text x="112" y="780" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">K_raw, V_raw: [B,T,32] each</text>
+<text x="112" y="810" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Both direct-attention paths use these K/V.</text>
+<rect x="90" y="865" width="600" height="155" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="112" y="899" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Latent selection on original events</text>
+<text x="112" y="935" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">score = a · K_raw / √32</text>
+<text x="112" y="965" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Logits: [B,2,512,T]</text>
+<text x="112" y="995" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Top-b indices: [B,2,512,16]</text>
+<rect x="90" y="1060" width="600" height="110" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1094" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Most recent original events</text>
+<text x="112" y="1130" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Recent indices / mask: [B,32]</text>
+<text x="112" y="1160" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Use the last R valid events; R = 32 proposed.</text>
+<rect x="90" y="1280" width="600" height="180" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1314" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Pack original events once</text>
+<text x="112" y="1350" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">K_raw, V_raw: [B,P,32] each</text>
+<text x="112" y="1380" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Slot refs: [B,2,512,16]</text>
+<text x="112" y="1410" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Recent refs: [B,32]   P ≤ L</text>
+<text x="112" y="1440" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Deduplicate by original event position.</text>
+<text x="110" y="1525" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">RAW BYPASS</text>
+<text x="110" y="1560" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">The actual ad reads original event details.</text>
+<text x="110" y="1590" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Contextualized states never replace this memory.</text>
+<text x="794" y="746" font-size="24" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">REPEAT 8× · full-history HSTU</text>
+<rect x="800" y="775" width="580" height="170" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="822" y="809" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Event → dictionary attention</text>
+<text x="822" y="845" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Q: [B,T,50] → 32</text>
+<text x="822" y="875" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">K_C, V_C: [1024,32] each</text>
+<text x="822" y="905" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Attention: [B,T,1024]</text>
+<text x="822" y="935" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Gated output is added to event states.</text>
+<rect x="800" y="1020" width="580" height="100" rx="14" fill="white" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="822" y="1054" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">HSTU block · causal event attention</text>
+<text x="822" y="1090" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">State width: [B,T,50]</text>
+<text x="800" y="1180" font-size="21" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All L valid events pass through every block.</text>
+<text x="800" y="1215" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Static dictionary K/V preserve causal dependencies.</text>
+<rect x="770" y="1300" width="640" height="100" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="792" y="1334" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Entire contextualized history H</text>
+<text x="792" y="1370" font-size="19" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">H: [B,T,50] → K_ctx, V_ctx: [B,T,32]</text>
+<rect x="770" y="1445" width="640" height="150" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="792" y="1479" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Per-latent full-history summarization</text>
+<text x="792" y="1515" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">p = masked_softmax(a · K_ctx / √32)</text>
+<text x="792" y="1545" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">s = Σ p[t] V_ctx[t]: [B,2,512,32]</text>
+<text x="792" y="1575" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Recent and selected events remain included.</text>
+<rect x="90" y="1670" width="1320" height="140" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1704" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">PREPARED USER MEMORY · independent of every candidate ad</text>
+<text x="112" y="1740" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Original K/V [B,P,32]   recent refs [B,32]   selected refs [B,2,512,16]</text>
+<text x="112" y="1770" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Full-history summaries [B,2,512,32]   masks, original positions, payloads, version</text>
+<text x="90" y="1840" font-size="20" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Every event reaches contextualization and summarization; raw selections add a separate detail-preserving path.</text>
+<rect x="1510" y="405" width="800" height="100" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="439" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">INPUT · candidate item / ad IDs</text>
+<text x="1532" y="475" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">IDs: [A,N]   A = 1 (catalog) or B</text>
+<rect x="1510" y="550" width="800" height="100" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="584" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Shared item embedding / feature encoder</text>
+<text x="1532" y="620" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Candidate feature vector: [A,N,50]</text>
+<rect x="1510" y="710" width="800" height="125" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="744" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">2 item experts → 2 distinct ad queries</text>
+<text x="1532" y="780" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each MLP: 50 → 64 → 32</text>
+<text x="1532" y="810" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Queries q: [A,N,2,32]</text>
+<rect x="1510" y="890" width="800" height="180" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1532" y="924" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Regular nonnegative sparse coding</text>
+<text x="1532" y="960" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Normalize each query; run 8 solver steps.</text>
+<text x="1532" y="990" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">512 atoms / expert → up to 16 positive active atoms.</text>
+<text x="1532" y="1020" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Active indices / masks / α: [A,N,2,16]</text>
+<text x="1532" y="1050" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Normalize retained coefficients for summary mixing.</text>
+<rect x="1510" y="1110" width="800" height="330" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="1144" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">PREPARED ITEM STATE</text>
+<text x="1532" y="1180" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Expert queries q:      [A,N,2,32]</text>
+<text x="1532" y="1210" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Value-space queries:   [A,N,2,32]</text>
+<text x="1532" y="1240" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Active indices / mask: [A,N,2,16]</text>
+<text x="1532" y="1270" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Coefficients / α:      [A,N,2,16]</text>
+<text x="1532" y="1300" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Expert gates π:        [A,N,2]</text>
+<text x="1532" y="1330" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Gate = item-only Linear(50 → 2) + softmax.</text>
+<text x="1532" y="1360" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Sparse reconstruction / L1 objective during training.</text>
+<rect x="1510" y="1510" width="800" height="280" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1532" y="1544" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">COMPUTATION BOUNDARY</text>
+<text x="1532" y="1580" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">User side reads dictionaries as model parameters.</text>
+<text x="1532" y="1610" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Actual ad queries and active supports enter scoring.</text>
+<text x="1532" y="1640" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All expert dictionaries influence the shared backbone.</text>
+<text x="1532" y="1670" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each expert has its own selections and summaries.</text>
+<text x="1532" y="1700" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Dictionary updates invalidate user and item caches.</text>
+<text x="1532" y="1730" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">This graph specifies the proposed revision.</text>
+<text x="84" y="1956" font-size="24" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">USER–ITEM SCORING · three separate evidence paths per item expert</text>
+<rect x="90" y="1985" width="2220" height="85" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="112" y="2019" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Route item state to prepared user memory · no history re-encoding</text>
+<text x="112" y="2055" font-size="20" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Per expert / chunk: q [B,n,32]   recent R₀ ≤ min(32,L)   selected union U ≤ min(256,L)   active α [B,n,16]</text>
+<rect x="90" y="2125" width="700" height="215" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="2159" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">1 · RECENT ORIGINAL EVENTS</text>
+<text x="112" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">K/V: [B,n,R₀,32]</text>
+<text x="112" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Actual-ad softmax over the recent window.</text>
+<text x="112" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Output r_recent: [B,n,32]</text>
+<text x="112" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Independent of latent selection.</text>
+<rect x="850" y="2125" width="700" height="215" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="872" y="2159" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">2 · LATENT-SELECTED ORIGINALS</text>
+<text x="872" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">K/V: [B,n,U,32]</text>
+<text x="872" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Deduplicate the active-latent event union.</text>
+<text x="872" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Output r_selected: [B,n,32]</text>
+<text x="872" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Actual-ad softmax over selected events.</text>
+<rect x="1610" y="2125" width="700" height="215" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1632" y="2159" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">3 · CONTEXTUAL SUMMARIES</text>
+<text x="1632" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Gather s: [B,n,16,32]</text>
+<text x="1632" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">r_summary = Σ α[j] s[j]</text>
+<text x="1632" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Output r_summary: [B,n,32]</text>
+<text x="1632" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each s[j] covers the full contextual history.</text>
+<rect x="350" y="2430" width="1700" height="130" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="372" y="2464" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Fuse three evidence vectors separately for each item expert</text>
+<text x="372" y="2500" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Features: q + 3 vectors + 3 query/value products + 3 masks = 227 → 64 → 1</text>
+<text x="372" y="2530" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">Stack 2 expert logits: [B,n,2]   ·   overlap across paths is intentional</text>
+<rect x="600" y="2620" width="1200" height="100" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="622" y="2654" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">OUTPUT · item-gated mixture of expert logits</text>
+<text x="622" y="2690" font-size="21" fill="#172b44" font-family="DejaVu Sans Mono,sans-serif" font-weight="400" text-anchor="start">score = Σ π[e] score[e]: [B,n] → catalog / batch logits [B,N]</text>
+<text x="60" y="2790" font-size="21" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Dimensions: B = users · A = 1 or B · T = padded prefix length · N = candidates · n = chunk size · P = packed original-event count.</text>
+<text x="60" y="2825" font-size="21" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">R = 32 is proposed. Selected unions can cover all L ≤ 200 events at these budgets; reduced compute is not guaranteed. No benchmark run.</text>
+</svg>

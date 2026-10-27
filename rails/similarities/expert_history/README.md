@@ -1,71 +1,127 @@
 # ExpertHistory similarity
 
-Each item expert reads a shared event-level history through two paths: actual-item
-attention over selected events and sparse-coefficient-weighted summaries of the
-unselected tail. Dictionaries and their memory-query projections organize user
-history independently of candidate items.
+Each item expert reads user evidence through three paths:
+
+1. Actual-ad attention over the latest configured number of original events.
+2. Actual-ad attention over the deduplicated original events selected by its active latents.
+3. Sparse-coefficient-weighted full-history contextual summaries.
+
+Original events are captured after input preprocessing and before any sequence
+block or dictionary adapter. Selection uses these original embeddings. The entire
+valid prefix enters the SASRec/HSTU backbone; each block is preceded by gated
+event-to-static-dictionary attention. Each latent then summarizes every valid
+final contextualized event, including recent and selected events.
+
+The same bounded dictionary atoms drive sparse ad coding, original-event
+selection, inside-block conditioning, and contextual summary queries. Each item
+expert has its own dictionary and readout. One shared backbone reads all expert
+dictionaries. Its computation never uses a target ad or the target's active set.
 
 ## API
 
-```python
-memory = scorer.prepare_user(history_states, history_mask, event_payloads)
-items = scorer.prepare_items(item_embeddings, item_ids)
-scores, auxiliary_losses = scorer.score_prepared(memory, items)
-```
+The normal model entry point prepares original memory before encoding and final
+summaries afterward:
 
-Item embeddings have shape `[1 or batch, candidates, item_dim]`. Scores have shape
-`[batch, candidates]`. `UserMemory.index_batch`, `ItemState.index_batch`, and
-`ItemState.slice_candidates` preserve alignment without detaching gradients.
-`forward` preserves the existing similarity signature and requires explicit
-`user_memory`. The legacy user query tensor is used only for batch alignment.
+~~~python
+user_vector, memory = model.encode_with_history(
+    past_lengths, past_ids, past_embeddings, past_payloads)
+items = model._ndp_module.prepare_items(item_embeddings, item_ids)
+scores, auxiliary_losses = model._ndp_module.score_prepared(memory, items)
+~~~
 
-## Numerical and cache behavior
+The scorer also exposes explicit component APIs:
 
-- Nonnegative sparse codes use a fixed-step projected-gradient solver, a hard
-  support cap, and a deterministic single-atom fallback for all-zero codes.
-  Coefficients are normalized only for summary reads. The L1 objective uses their
-  original magnitudes. A Frobenius-norm Lipschitz upper bound provides a cheap,
-  conservative step size. Dictionary atoms are projected after optimizer steps.
-- User preparation stores full summary statistics and stable deep complements.
-  Up to `K_act * events_per_slot` numerical guard events per slot are retained by
-  reference to shared K/V storage. These guards do not expand the raw selection.
-  The scorer reads guards and subtracts additional union events from the deep
-  complement, using FP64 accumulation and separate scales. It never rescans
-  omitted history. Guard/complement bytes are included in memory accounting.
-- Prepared states are invalid after scorer weights, precision, device, or mode
-  change. Model-bridge memory also tracks its source history encoder's version.
-  Item caches are constructed only for evaluation; rebuild the evaluation state
-  after loading or changing weights or item features.
+~~~python
+context = scorer.prepare_model()
+raw = scorer.prepare_raw_history(raw_embeddings, history_mask, payloads, context)
+# The model's SASRec/HSTU blocks consume context.atoms through their adapters.
+memory = scorer.finish_user_memory(raw, contextual_states, history_mask, context)
 
-## Training and evaluation integration
+# Equivalent scorer-only preparation when both representations already exist:
+memory = scorer.prepare_user(raw_embeddings, contextual_states, history_mask, payloads)
+~~~
 
-`model.encode_with_history` returns the current user vector and explicit memory.
-Both backbones support sampled-prefix loss within their forward call so DDP can
-see the complete training graph. The sampler masks all future item IDs and event
-payloads. Positive and sampled-negative item states are prepared together; sparse
-loss is averaged once over the complete candidate batch. Candidate chunking and
-non-reentrant activation checkpointing do not change that averaging.
+Scorer-only preparation does not run the sequence encoder; callers must supply its
+actual contextualized output. The bridge rejects preparation from final states
+alone. Recent and selected lists reference packed original K/V shared by storage.
+Full-history summaries are normalized vectors; no tail exclusion, complement
+statistics, or numerical guard lists are used.
 
-`LearnedBruteForceTopK` caches item states and scores catalog chunks exactly under
-the model logits. The root candidate wrapper retains seen-item filtering.
-Evaluation slices memory and user payloads together for user microbatches.
+Item embeddings have shape [1 or batch, candidates, item_dim]; scores have shape
+[batch, candidates]. UserMemory.index_batch, ItemState.index_batch, and
+ItemState.slice_candidates preserve alignment and gradients. The legacy
+similarity forward requires explicit user_memory and uses the user vector for
+batch alignment.
 
-The two ready-to-use configurations are
-`configs/ml-1m/sasrec-expert-history.gin` and
-`configs/ml-1m/hstu-expert-history.gin`. The experiment registry also exposes
-raw-only, equal-weight-tail, shared-memory, one-expert, and full-history ablations.
-Training and inference runners require explicit execution; importing the modules
-does not run them. The inference runner's optional `--measure-latency` flag enables
-CUDA-event timing; otherwise it records logical operation counts only. It reports
-model-only preparation separately, user/item cache bytes, and peak memory.
+## Configuration
+
+Both ML-1M ExpertHistory configs set:
+
+| Setting | Value |
+| --- | --- |
+| Item experts | 2 |
+| Dictionary atoms per expert | 512 |
+| Maximum active latents per expert | 16 |
+| Selected events per latent | 16 |
+| Recent original events | 32 |
+| Sparse solver steps | 8 |
+| Dictionary attention per block | Enabled; one head of width 32 |
+| Initial dictionary gate | 0.01 |
+| Full-history contextual summaries | Enabled |
+
+The factory exposes these budgets, summary/selection switches, adapter dimensions,
+and gate initialization as Gin bindings. The experiment registry offers raw-only,
+uniform-summary, ordinary-context, recent-only, no-recent, shared-memory,
+one-expert, and full-history selection ablations. No benchmark is run by importing
+these modules.
+
+## Training, caches, and checkpoints
+
+Nonnegative sparse coding uses a fixed-step projected-gradient solver, positive
+support truncation, and a deterministic one-atom fallback. Normalize coefficients
+only for summary mixing; retain their magnitudes for the reconstruction/L1 loss.
+A cached Frobenius-norm step bound stays safe across inference-to-training
+transitions. Project dictionary atoms into the unit ball after optimizer steps.
+
+Selection and summarization share an atom-to-history query projection so hard
+selection does not leave a separate selector projection without gradients.
+Dictionary attention is pointwise over static atoms, preserving causal sequence
+dependencies. All-position event states remain causal, but global memory lists
+and summaries belong to one prefix and cannot supervise earlier cuts.
+
+Both backbones prepare sampled-prefix loss inside their distributed forward.
+Positive and negative item states share one prefix memory; aggregate sparse loss
+once per logical candidate batch. Activation checkpointing preserves the gradient
+path through SASRec adapters and the dictionary.
+
+Prepare and move model parameters outside torch.inference_mode; use inference
+mode for execution. Versioned caches require normal parameter version counters.
+Cache dictionary projections only in evaluation, and retain autograd in training.
+Changing dictionary atoms invalidates model context, user/item states, and
+HSTU history caches because the atoms now affect contextualization. Adapter and
+other encoder changes invalidate their dependent history states as well.
+
+Checkpoint/prepared-state architecture version is **2**. Complete version-1
+two-path checkpoints are incompatible. New checkpoints include block adapters,
+separate original/contextual projections, three-path fusion, and recent-event
+settings. Existing DotProduct/MoL parameter paths remain compatible.
+
+LearnedBruteForceTopK caches item states and scores catalog chunks exactly under
+the new logits. Evaluation slices every memory field alongside user payloads.
+Inference accounting charges all block adapters and full-history preparation to
+U, item coding to I, and the three prepared readouts to S; model-only dictionary
+projection caches are reported separately.
 
 ## Correctness checks
 
-```sh
+~~~sh
 .venv/bin/python -m unittest playground.test_expert_history -v
-```
+.venv/bin/python -m unittest discover -s playground -p 'test_inference_flops_counter.py' -v
+~~~
 
-The tests include direct masked-history references, concentrated-tail cases,
-chunked gradients, serialization, dictionary constraints, causal prefixes,
-exact retrieval, DDP forwarding, real local ML-1M rows for both backbones, and
-operation-counter reconciliation. No benchmark entry point is invoked.
+Checks cover independent three-path attention references, original/contextual
+provenance, full-history coverage, coefficient sensitivity, isolated adapter
+gradients, causal prefixes, cache invalidation, checkpoint versions, exact
+retrieval, sampled-prefix DDP forwarding, baseline checkpoint compatibility,
+tiny local real-data updates for both backbones, and operation reconciliation.
+These tests do not invoke a benchmark entry point.

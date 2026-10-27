@@ -1,139 +1,171 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="1540" viewBox="0 0 1600 1540" role="img" aria-labelledby="title desc">
-<title id="title">Expert-conditioned history retrieval: innovations 1, 2, and 3</title>
-<desc id="desc">Shared HSTU or SASRec history encoding prepares target-independent memory with item-expert-specific dictionaries. Each actual ad expert supplies its own query, active sparse-code atoms, and continuous coefficients. Two scoring paths combine direct attention over selected events and coefficient-weighted summaries of the remaining history. Expert scores are mixed after interaction.</desc>
-<metadata>Updated 2026-10-27. Companion: retrieval_model_improvement_plan.md</metadata>
-<defs><style>
-text {font-family:'DejaVu Sans',Arial,sans-serif;fill:#172b44}
-.title{font-size:34px;font-weight:700}.subtitle{font-size:18px;fill:#52647c}
-.cardtitle{font-size:20px;font-weight:700}.section{font-size:19px;font-weight:700}
-.label{font-size:18px;font-weight:700}.body{font-size:16px}.small{font-size:14px;fill:#52647c}.tiny{font-size:13px;fill:#52647c}
-.white{fill:white}.blue{fill:#1456a0}.orange{fill:#9b4b12}.purple{fill:#6741a5}.green{fill:#22634d}
-.line{fill:none;stroke:#677c96;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#arrow)}
-.paramline{fill:none;stroke:#8963bf;stroke-width:2;stroke-dasharray:6 5;stroke-linejoin:round;marker-end:url(#pa)}
-</style>
-<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#677c96"/></marker>
-<marker id="pa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#8963bf"/></marker></defs>
-<rect x="0" y="0" width="1600" height="1540" rx="0" fill="#f5f7fb" stroke="#f5f7fb" stroke-width="1.5"/>
-<text x="40" y="51" class="title">Ranking-style history interaction for retrieval</text>
-<text x="40" y="82" class="subtitle">Prepare user memory once. Let each actual ad expert read detailed evidence and the compressed tail.</text>
-<rect x="40" y="106" width="496" height="90" rx="14" fill="#eaf3ff" stroke="#b7d4f5" stroke-width="1.5"/>
-<circle cx="67" cy="133" r="14" fill="#2468b8"/>
-<text x="62" y="139" class="body white">1</text>
-<text x="91" y="140" class="cardtitle blue">Actual-ad cross-attention</text>
-<text x="60" y="171" class="body">Read selected events with the actual candidate query.</text>
-<rect x="552" y="106" width="496" height="90" rx="14" fill="#f1eafa" stroke="#d2bce9" stroke-width="1.5"/>
-<circle cx="579" cy="133" r="14" fill="#8050b8"/>
-<text x="574" y="139" class="body white">2</text>
-<text x="603" y="140" class="cardtitle purple">Ad-derived codebook memory</text>
-<text x="572" y="171" class="body">Reusable selections and weighted tail summaries.</text>
-<rect x="1064" y="106" width="496" height="90" rx="14" fill="#fff1e6" stroke="#ebc7a7" stroke-width="1.5"/>
-<circle cx="1091" cy="133" r="14" fill="#bd6a28"/>
-<text x="1086" y="139" class="body white">3</text>
-<text x="1115" y="140" class="cardtitle orange">Item-expert-specific interaction</text>
-<text x="1084" y="171" class="body">Multiple queries; a codebook system for each expert.</text>
-<rect x="40" y="220" width="1520" height="76" rx="14" fill="#f1eafa" stroke="#cbb4e4" stroke-width="1.5"/>
-<text x="62" y="249" class="section purple">SHARED MODEL PARAMETERS</text>
-<text x="62" y="276" class="body">Expert-specific dictionaries C[e, atom] + learned atom-to-history queries a[e, atom]</text>
-<text x="1005" y="250" class="small purple">Ad structure learned in parameters</text>
-<text x="1005" y="275" class="small">No target-ad features enter user preparation</text>
-<rect x="40" y="320" width="720" height="520" rx="18" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.5"/>
-<text x="62" y="348" class="section blue">USER-ONLY PREPARATION</text>
-<rect x="64" y="366" width="660" height="54" rx="10" fill="white" stroke="#bad2ed" stroke-width="1.5"/>
-<text x="84" y="390" class="label">User history: event identities, actions, and timestamps</text>
-<text x="84" y="409" class="small">Only the valid causal prefix; independent of every candidate ad</text>
-<path d="M394 420 V443" class="line"/>
-<rect x="64" y="446" width="660" height="64" rx="10" fill="white" stroke="#bad2ed" stroke-width="1.5"/>
-<text x="84" y="473" class="label">One shared HSTU / SASRec history encoder</text>
-<text x="84" y="497" class="body">Preserve event-level keys and values K/V; share them across experts</text>
-<path d="M394 510 V537" class="line"/>
-<rect x="64" y="540" width="660" height="76" rx="10" fill="white" stroke="#bba0df" stroke-width="1.5"/>
-<text x="84" y="567" class="label purple">Build a memory slot for every expert / dictionary atom</text>
-<text x="84" y="592" class="body">Latent relevance: w[t] = exp(a · k[t] / √d)</text>
-<text x="84" y="609" class="tiny">Code queries organize the history before a target ad is known</text>
-<path d="M744 296 V576 H727" class="paramline"/>
-<path d="M220 616 V643" class="line"/>
-<path d="M560 616 V643" class="line"/>
-<rect x="64" y="646" width="314" height="136" rx="12" fill="white" stroke="#bad2ed" stroke-width="1.5"/>
-<text x="82" y="674" class="label blue">Selected raw events</text>
-<text x="82" y="703" class="body">Top-b indices for each slot</text>
-<text x="82" y="727" class="body">Keep original event K/V</text>
-<text x="82" y="754" class="small">Shared storage; lists reference events</text>
-<text x="82" y="773" class="tiny">Preserve position and action/time payloads</text>
-<rect x="394" y="646" width="330" height="136" rx="12" fill="white" stroke="#cbb4e4" stroke-width="1.5"/>
-<text x="412" y="674" class="label purple">Full-history summaries</text>
-<text x="412" y="703" class="body">Z = Σ w[t]</text>
-<text x="412" y="727" class="body">U = Σ w[t] × v[t]</text>
-<text x="412" y="754" class="small">One scalar + one value vector per slot</text>
-<text x="412" y="773" class="tiny">Target-independent sums over valid history</text>
-<path d="M220 782 V803 H560 V782 M400 803 V840" fill="none" stroke="#677c96" stroke-width="2.2"/>
-<text x="64" y="824" class="small blue">Reusable memory for every candidate</text>
-<rect x="800" y="320" width="760" height="520" rx="18" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.5"/>
-<text x="824" y="348" class="section orange">ITEM-ONLY PREPARATION</text>
-<rect x="828" y="366" width="704" height="54" rx="10" fill="white" stroke="#e6c5aa" stroke-width="1.5"/>
-<text x="848" y="390" class="label">Actual ad features → shared item feature encoder</text>
-<text x="848" y="409" class="small">Static-ad outputs can be cached for a fixed model and codebook version</text>
-<path d="M1180 420 V443" class="line"/>
-<rect x="828" y="446" width="704" height="64" rx="10" fill="white" stroke="#e6c5aa" stroke-width="1.5"/>
-<text x="848" y="473" class="label orange">Item experts: q₁, q₂, …, qE</text>
-<text x="848" y="497" class="body">Keep E distinct queries through interaction; do not average them first</text>
-<path d="M1000 510 V537" class="line"/>
-<path d="M1360 510 V537" class="line"/>
-<rect x="828" y="540" width="344" height="76" rx="10" fill="white" stroke="#cbb4e4" stroke-width="1.5"/>
-<text x="846" y="567" class="label purple">Sparse ad-to-latent coding</text>
-<text x="846" y="592" class="body">Nonnegative codes; top-K active atoms</text>
-<text x="846" y="609" class="tiny">Active atoms address user-memory slots</text>
-<path d="M812 296 V576 H825" class="paramline"/>
-<path d="M1172 578 H1185" class="line"/>
-<rect x="1188" y="540" width="344" height="76" rx="10" fill="white" stroke="#e6c5aa" stroke-width="1.5"/>
-<text x="1206" y="567" class="label orange">Continuous ad gates</text>
-<text x="1206" y="592" class="body">Normalize coefficients → weights α[e,j]</text>
-<text x="1206" y="609" class="tiny">Item-only expert gates π[e] mix final scores</text>
-<path d="M1000 616 V643" class="line"/>
-<path d="M1360 616 V643" class="line"/>
-<rect x="828" y="646" width="704" height="136" rx="12" fill="white" stroke="#e6c5aa" stroke-width="1.5"/>
-<text x="848" y="674" class="label orange">Prepared item state — independent of the user</text>
-<text x="848" y="703" class="body">For each expert e: query q[e] + active atom indices + sparse coefficients</text>
-<text x="848" y="727" class="body">Item-only gate π[e] combines expert scores after their interactions</text>
-<text x="848" y="754" class="small">Each item expert retains its own query, codebooks, and history reads</text>
-<text x="848" y="773" class="tiny">Active atoms select memory; coefficient magnitudes control the read</text>
-<path d="M1180 782 V840" fill="none" stroke="#677c96" stroke-width="2.2"/>
-<text x="828" y="824" class="small orange">Cached item queries, codes, and gates</text>
-<rect x="40" y="868" width="1520" height="530" rx="18" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.5"/>
-<text x="64" y="899" class="section green">USER–ITEM SCORING — REPEAT THE TWO PATHS FOR EACH ITEM EXPERT</text>
-<text x="64" y="922" class="small">Read prepared memory and selected events; do not rescan omitted history for every ad.</text>
-<path d="M400 840 V852 H52 V934 H450 V943" class="line"/>
-<path d="M1180 840 V852 H1548 V934 H1150 V943" class="line"/>
-<rect x="308" y="946" width="984" height="58" rx="11" fill="white" stroke="#b7d4c6" stroke-width="1.5"/>
-<text x="332" y="970" class="label">Gather memory slots using expert e's active sparse-code atoms</text>
-<text x="332" y="991" class="body">Union and deduplicate selected event positions → S[e]; retain active summary statistics</text>
-<path d="M416 1004 V1035" class="line"/>
-<path d="M1160 1004 V1035" class="line"/>
-<rect x="72" y="1038" width="690" height="142" rx="12" fill="white" stroke="#9dbfe4" stroke-width="1.5"/>
-<text x="94" y="1066" class="label blue">PATH A · SELECTED RAW EVENTS</text>
-<text x="94" y="1094" class="body">Actual query q[e] cross-attends directly to event K/V in S[e]</text>
-<text x="94" y="1121" class="body">Normalize actual-ad attention over the deduplicated selected set</text>
-<text x="94" y="1150" class="label blue">Output: r_raw[e]</text>
-<text x="94" y="1171" class="tiny">Exact on retained events; not equivalent to full-history attention</text>
-<rect x="806" y="1038" width="722" height="142" rx="12" fill="white" stroke="#c4addf" stroke-width="1.5"/>
-<text x="828" y="1066" class="label purple">PATH B · ACTIVATION-WEIGHTED TAIL SUMMARIES</text>
-<text x="828" y="1094" class="body">For each active slot: subtract all S[e] event contributions from U and Z</text>
-<text x="828" y="1121" class="body">Normalize each tail summary, then mix using this ad's weights α[e,j]</text>
-<text x="828" y="1150" class="label purple">Output: r_tail[e] = Σ α[e,j] × z_tail[e,j]</text>
-<text x="828" y="1171" class="tiny">No raw/tail overlap within an expert; handle empty tails with a mask</text>
-<path d="M416 1180 V1196 H560 V1215" class="line"/>
-<path d="M1160 1180 V1196 H1040 V1215" class="line"/>
-<rect x="388" y="1218" width="824" height="64" rx="12" fill="white" stroke="#a9c9b9" stroke-width="1.5"/>
-<text x="412" y="1244" class="label green">Expert score s[e] = G[e](q[e], r_raw[e], r_tail[e], masks)</text>
-<text x="412" y="1268" class="body">One history interaction per expert; combine evidence before mixing experts</text>
-<path d="M800 1282 V1303" class="line"/>
-<rect x="388" y="1306" width="824" height="64" rx="12" fill="#22634d" stroke="#22634d" stroke-width="1.5"/>
-<text x="412" y="1333" class="label white">FINAL RETRIEVAL LOGIT: s(u, i) = Σ π[e](i) × s[e](u, i)</text>
-<text x="412" y="1357" class="body white">Exact chunked catalog scoring first · compare accuracy, memory, and compute</text>
-<rect x="40" y="1420" width="1520" height="90" rx="14" fill="white" stroke="#d9e1ec" stroke-width="1.5"/>
-<text x="62" y="1448" class="label">Design boundary</text>
-<text x="62" y="1473" class="body">User-only memory + item-only queries/codes → candidate-specific reads in the scorer</text>
-<text x="62" y="1496" class="small">Selected events retain detail; activation-weighted tail summaries retain broader user context.</text>
-<a xlink:href="retrieval_model_improvement_plan.md">
-<text x="1140" y="1448" class="small purple">Companion: model improvement plan ↗</text>
-</a></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="2860" viewBox="0 0 2400 2860" role="img" aria-labelledby="title desc">
+<title id="title">Ranking-style history interaction for retrieval</title>
+<desc id="desc">Proposed three-path ExpertHistory. Latents select original events before the encoder, participate inside every full-history SASRec/HSTU block, and summarize all contextualized events. Item experts perform recent-event attention, selected-original-event attention, and activation-weighted full-history summary reads. No target ad enters user preparation.</desc>
+<metadata>Proposed architecture, 2026-10-27. Sources: retrieval_model_improvement_plan.md and ../new_similarity_scoring_plan.md. Dimensions describe the design, not a verified implementation. No benchmark executed.</metadata>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#71839a"/></marker>
+<marker id="param-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#8963bf"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#f5f7fb"/>
+<rect x="60" y="350" width="1380" height="1510" rx="18" fill="#edf5ff" stroke="#b7d4f5" stroke-width="1.6"/>
+<rect x="1480" y="350" width="860" height="1510" rx="18" fill="#fff3e9" stroke="#ebc7a7" stroke-width="1.6"/>
+<rect x="770" y="710" width="640" height="540" rx="18" fill="#f2eafa" stroke="#cbb4e4" stroke-width="1.6"/>
+<rect x="60" y="1920" width="2280" height="825" rx="18" fill="#eff7f3" stroke="#b7d4c6" stroke-width="1.6"/>
+<path d="M750,505 L750,550" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M400,655 L400,710" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,820 L390,865" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M690,765 L725,765 L725,1115 L690,1115" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M90,942 L78,942 L78,1365 L90,1365" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,1170 L390,1280" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,655 L1090,775" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,945 L1090,1020" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1250 L1090,1300" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1400 L1090,1445" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390,1460 L390,1480 L720,1480 L720,1640 L390,1640 L390,1670" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1090,1595 L1090,1670" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,505 L1910,550" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,650 L1910,710" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,835 L1910,890" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1910,1070 L1910,1110" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2310,600 L2325,600 L2325,1380 L2310,1380" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1455,305 L1455,680 L720,680 L720,942 L690,942" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,850 L1380,850" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,1520 L1410,1520" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M1455,305 L1455,975 L1510,975" fill="none" stroke="#8963bf" stroke-width="2.6" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#param-arrow)"/>
+<path d="M750,1810 L750,1890 L600,1890 L600,1985" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M2310,1275 L2330,1275 L2330,1890 L1850,1890 L1850,1985" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M440,2070 L440,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2070 L1200,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1960,2070 L1960,2125" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M440,2340 L440,2385 L780,2385 L780,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2340 L1200,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1960,2340 L1960,2385 L1620,2385 L1620,2430" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1200,2560 L1200,2620" fill="none" stroke="#71839a" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="60" y="62" font-size="40" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Ranking-style history interaction for retrieval</text>
+<text x="60" y="104" font-size="24" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">PROPOSED REVISION · pre-block raw selection + latent-aware sequence blocks + full-history summaries</text>
+<text x="60" y="142" font-size="22" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">2 item experts  ·  512 latents / expert  ·  up to 16 active latents / expert  ·  16 selected events / latent  ·  recent R = 32 proposed</text>
+<rect x="60" y="175" width="2280" height="130" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="82" y="209" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SHARED AD-DERIVED PARAMETERS · one canonical dictionary</text>
+<text x="82" y="245" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each item expert owns a dictionary; the same atoms connect ad queries to user-history processing.</text>
+<text x="82" y="275" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Dashed purple arrows carry static model parameters. The current target ad is never an input to user preparation.</text>
+<text x="84" y="386" font-size="24" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">USER-ONLY PREPARATION · once per causal history prefix</text>
+<text x="1504" y="386" font-size="24" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">ITEM-ONLY PREPARATION</text>
+<rect x="90" y="405" width="1320" height="100" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="439" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">INPUT · history IDs, valid-event mask, time / action payloads</text>
+<text x="112" y="475" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Only events available at the scored prefix; retain original positions and repeated interactions.</text>
+<rect x="90" y="550" width="1320" height="105" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="584" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Original event embeddings X · capture before any sequence block or dictionary adapter</text>
+<text x="112" y="620" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Branch here: original-event memory bypasses the encoder; the entire sequence also enters the backbone.</text>
+<rect x="90" y="710" width="600" height="110" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="744" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Original-event K/V projections</text>
+<text x="112" y="780" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Preserve pre-block event features.</text>
+<text x="112" y="810" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Both direct-attention paths use these K/V.</text>
+<rect x="90" y="865" width="600" height="155" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="112" y="899" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Latent selection on original events</text>
+<text x="112" y="935" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each latent selects its top 16 valid events.</text>
+<text x="112" y="965" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Selection reads original event embeddings.</text>
+<text x="112" y="995" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Do not truncate the sequence encoder input.</text>
+<rect x="90" y="1060" width="600" height="110" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1094" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Most recent original events</text>
+<text x="112" y="1130" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Keep the latest R valid events directly.</text>
+<text x="112" y="1160" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Independent of all latent selections.</text>
+<rect x="90" y="1280" width="600" height="180" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1314" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Pack original events once</text>
+<text x="112" y="1350" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Recent + selected events share storage.</text>
+<text x="112" y="1380" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Keep original event IDs, positions, payloads.</text>
+<text x="112" y="1410" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Repeated item IDs remain separate events.</text>
+<text x="112" y="1440" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Shared storage does not merge the paths.</text>
+<text x="110" y="1525" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">RAW BYPASS</text>
+<text x="110" y="1560" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">The actual ad reads original event details.</text>
+<text x="110" y="1590" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Contextualized states never replace this memory.</text>
+<text x="794" y="746" font-size="24" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">REPEAT · full-history sequence blocks</text>
+<rect x="800" y="775" width="580" height="170" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="822" y="809" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Event → dictionary attention</text>
+<text x="822" y="845" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Every event reads static ad prototypes.</text>
+<text x="822" y="875" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All expert dictionaries participate.</text>
+<text x="822" y="905" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Gated context changes the block input.</text>
+<text x="822" y="935" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">No target ad or future history is used.</text>
+<rect x="800" y="1020" width="580" height="100" rx="14" fill="white" stroke="#cbd5e1" stroke-width="1.6"/>
+<text x="822" y="1054" font-size="23" fill="#475569" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">SASRec / HSTU sequence block</text>
+<text x="822" y="1090" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Preserve causal masks and position / time.</text>
+<text x="800" y="1180" font-size="21" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All L valid events pass through every block.</text>
+<text x="800" y="1215" font-size="20" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Static dictionary K/V preserve causal dependencies.</text>
+<rect x="770" y="1300" width="640" height="100" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="792" y="1334" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Entire contextualized history H</text>
+<text x="792" y="1370" font-size="19" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">One contextual state for every valid event.</text>
+<rect x="770" y="1445" width="640" height="150" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="792" y="1479" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Per-latent full-history summarization</text>
+<text x="792" y="1515" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each latent reads the entire output sequence.</text>
+<text x="792" y="1545" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Normalize over all valid contextualized events.</text>
+<text x="792" y="1575" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Recent and selected events remain included.</text>
+<rect x="90" y="1670" width="1320" height="140" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="1704" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">PREPARED USER MEMORY · independent of every candidate ad</text>
+<text x="112" y="1740" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Original-event memory + recent list + all latent selection lists + all latent full-history summaries.</text>
+<text x="112" y="1770" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Prepare all 1,024 slots. Candidate activation is applied only when the scorer reads this memory.</text>
+<text x="90" y="1840" font-size="20" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Every event reaches contextualization and summarization; raw selections add a separate detail-preserving path.</text>
+<rect x="1510" y="405" width="800" height="100" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="439" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">INPUT · candidate item / ad IDs</text>
+<text x="1532" y="475" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Shared catalog or per-user candidate samples.</text>
+<rect x="1510" y="550" width="800" height="100" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="584" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Shared item embedding / feature encoder</text>
+<text x="1532" y="620" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Cache item preparation for a fixed model version.</text>
+<rect x="1510" y="710" width="800" height="125" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="744" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">2 item experts → 2 distinct ad queries</text>
+<text x="1532" y="780" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each expert keeps its own query through scoring.</text>
+<text x="1532" y="810" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Item-only gate supplies the final expert mixture.</text>
+<rect x="1510" y="890" width="800" height="180" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1532" y="924" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Regular nonnegative sparse coding</text>
+<text x="1532" y="960" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Code each expert query with its own dictionary.</text>
+<text x="1532" y="990" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Keep up to 16 positive active atoms per expert.</text>
+<text x="1532" y="1020" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Use continuous normalized activation weights.</text>
+<text x="1532" y="1050" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Same active set can have different weights.</text>
+<rect x="1510" y="1110" width="800" height="330" rx="14" fill="white" stroke="#ebc7a7" stroke-width="1.6"/>
+<text x="1532" y="1144" font-size="23" fill="#a34d12" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">PREPARED ITEM STATE</text>
+<text x="1532" y="1180" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Expert-specific queries and active atom indices.</text>
+<text x="1532" y="1210" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Continuous coefficients and normalized weights.</text>
+<text x="1532" y="1240" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Item-only expert gates.</text>
+<text x="1532" y="1270" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Fixed-checkpoint catalog states can be cached.</text>
+<text x="1532" y="1300" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Reuse item state across user requests.</text>
+<text x="1532" y="1330" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">No user history enters item preparation.</text>
+<text x="1532" y="1360" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Recommendation and sparse coding train jointly.</text>
+<rect x="1510" y="1510" width="800" height="280" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1532" y="1544" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">COMPUTATION BOUNDARY</text>
+<text x="1532" y="1580" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">User side reads dictionaries as model parameters.</text>
+<text x="1532" y="1610" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Actual ad queries and active supports enter scoring.</text>
+<text x="1532" y="1640" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All expert dictionaries influence the shared backbone.</text>
+<text x="1532" y="1670" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Each expert has its own selections and summaries.</text>
+<text x="1532" y="1700" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Dictionary updates invalidate user and item caches.</text>
+<text x="1532" y="1730" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">This graph specifies the proposed revision.</text>
+<text x="84" y="1956" font-size="24" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">USER–ITEM SCORING · three separate evidence paths per item expert</text>
+<rect x="90" y="1985" width="2220" height="85" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="112" y="2019" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Route item state to prepared user memory · no history re-encoding</text>
+<text x="112" y="2055" font-size="20" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Actual query reads recent originals and the active-latent union; activation weights read contextual summaries.</text>
+<rect x="90" y="2125" width="700" height="215" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="112" y="2159" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">1 · RECENT ORIGINAL EVENTS</text>
+<text x="112" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Keep the latest R original events.</text>
+<text x="112" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">The actual expert query attends directly.</text>
+<text x="112" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Separate recent-window normalization.</text>
+<text x="112" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Preserves recent event details.</text>
+<rect x="850" y="2125" width="700" height="215" rx="14" fill="white" stroke="#b7d4f5" stroke-width="1.6"/>
+<text x="872" y="2159" font-size="23" fill="#175baa" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">2 · LATENT-SELECTED ORIGINALS</text>
+<text x="872" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Gather selected originals from active slots.</text>
+<text x="872" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Deduplicate by original event position.</text>
+<text x="872" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">The actual expert query attends directly.</text>
+<text x="872" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Retains relevant events from any history age.</text>
+<rect x="1610" y="2125" width="700" height="215" rx="14" fill="white" stroke="#cbb4e4" stroke-width="1.6"/>
+<text x="1632" y="2159" font-size="23" fill="#7041ad" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">3 · CONTEXTUAL SUMMARIES</text>
+<text x="1632" y="2195" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Read full-history latent summaries.</text>
+<text x="1632" y="2225" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Mix using continuous ad activation weights.</text>
+<text x="1632" y="2255" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">All valid events were included upstream.</text>
+<text x="1632" y="2285" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Recent / selected events are not excluded.</text>
+<rect x="350" y="2430" width="1700" height="130" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="372" y="2464" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">Fuse three evidence vectors separately for each item expert</text>
+<text x="372" y="2500" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Small expert MLP reads all three vectors, query interactions, and presence masks.</text>
+<text x="372" y="2530" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">The same event may supply original detail and contextual evidence; learned fusion combines them.</text>
+<rect x="600" y="2620" width="1200" height="100" rx="14" fill="white" stroke="#b7d4c6" stroke-width="1.6"/>
+<text x="622" y="2654" font-size="23" fill="#22634d" font-family="DejaVu Sans,sans-serif" font-weight="700" text-anchor="start">OUTPUT · item-gated mixture of expert logits</text>
+<text x="622" y="2690" font-size="21" fill="#172b44" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Use recommendation logits for next-item training or exact chunked catalog top-k.</text>
+<text x="60" y="2790" font-size="21" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">Dimensions: B = users · A = 1 or B · T = padded prefix length · N = candidates · n = chunk size · P = packed original-event count.</text>
+<text x="60" y="2825" font-size="21" fill="#52647c" font-family="DejaVu Sans,sans-serif" font-weight="400" text-anchor="start">R = 32 is proposed. Selected unions can cover all L ≤ 200 events at these budgets; reduced compute is not guaranteed. No benchmark run.</text>
+</svg>

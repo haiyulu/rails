@@ -146,6 +146,8 @@ def get_sequential_encoder(
     else:
         raise ValueError(f"Unsupported module_type {module_type}")
     initialize = getattr(interaction_module, "initialize_after_encoder_construction", None)
+    if getattr(interaction_module,'uses_appended_latents',False):
+        model._activation_checkpoint=activation_checkpoint
     if initialize is not None:
         initialize()
     return model
