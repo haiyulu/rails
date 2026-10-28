@@ -1,0 +1,255 @@
+diff --git a/playground/run_ml1m_benchmark.py b/playground/run_ml1m_benchmark.py
+index 8b47d9e..57daf34 100644
+--- a/playground/run_ml1m_benchmark.py
++++ b/playground/run_ml1m_benchmark.py
+@@ -8,6 +8,7 @@ import argparse
+ import csv
+ import hashlib
+ import json
++import math
+ import os
+ from pathlib import Path
+ import shutil
+@@ -70,7 +71,36 @@ def evaluate(config, checkpoint, output, env, manifest, model_name):
+     return json.loads(output.read_text())
+ 
+ 
++def verify_paper(run, model, metrics, manifest):
++    """Check final baseline metrics against a declared reproduction band."""
++    policy = manifest.get("paper_verification", {})
++    if not policy.get("required") or model not in TARGETS:
++        return
++    tolerance = policy["absolute_tolerance"]
++    deltas = {key: metrics[key] - target for key, target in zip(METRICS, TARGETS[model])}
++    result = {
++        "selection": "final", "metrics": {key: metrics[key] for key in METRICS},
++        "targets": dict(zip(METRICS, TARGETS[model])), "deltas": deltas,
++        "passed": all(abs(value) <= tolerance for value in deltas.values()),
++    }
++    results = policy.setdefault("results", {})
++    results[model] = result
++    gain_check = None
++    if "sasrec" in results and "sasrec_mol" in results:
++        gains = {key: results["sasrec_mol"]["metrics"][key] - results["sasrec"]["metrics"][key]
++                 for key in ("hr@10", "hr@50")}
++        gain_check = {"gains": gains, "passed": all(value > 0 for value in gains.values())}
++        policy["sasrec_mol_gain"] = gain_check
++    dump(run / "paper_consistency.json", policy)
++    dump(run / "manifest.json", manifest)
++    if not result["passed"] or (gain_check is not None and not gain_check["passed"]):
++        raise RuntimeError(f"Paper consistency check failed for {model}; inspect {run / 'paper_consistency.json'}")
++
++
+ def report(run):
++    manifest_path = run / "manifest.json"
++    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
++    expected_epochs = manifest.get("num_epochs", 101)
+     rows = []
+     for model in MODELS:
+         epochs_file = run / model / "epochs.jsonl"
+@@ -78,7 +108,7 @@ def report(run):
+             continue
+         epochs = [json.loads(line) for line in epochs_file.read_text().splitlines()]
+         best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+-        last_selection = "final" if len(epochs) == 101 else "latest_incomplete"
++        last_selection = "final" if len(epochs) == expected_epochs else "latest_incomplete"
+         for selection, row in [(last_selection, epochs[-1]), ("best_eval_hr10", best)]:
+             rows.append({"model": model, "selection": selection, "epoch": row["epoch"],
+                          "epochs_completed": len(epochs), **{m: row["metrics"][m] for m in METRICS},
+@@ -99,6 +129,7 @@ def report(run):
+         writer.writerows(rows)
+     lines = ["# ML-1M benchmark results", "",
+              "Seed 42; supplied configurations; full-catalog exact scoring.",
++             f"Scheduled training budget: {expected_epochs} epochs per model.",
+              "Prefix and all-position supervision have different target exposure; compare matched protocols.",
+              "Best epoch is selected on the evaluation set, not an independent validation set.",
+              "Epoch numbers are zero-based. Training time includes evaluation and checkpoint saving.",
+@@ -107,6 +138,8 @@ def report(run):
+              "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+     if any(row["selection"] == "latest_incomplete" for row in rows):
+         lines[2:2] = ["**Training is in progress. Partial metrics are not final benchmark results.**", ""]
++    if expected_epochs < 101:
++        lines[2:2] = ["**Short-run comparison: early-training results, without a convergence claim. Paper rows use a different training budget.**", ""]
+     manifest_path = run / "manifest.json"
+     if manifest_path.exists():
+         manifest = json.loads(manifest_path.read_text())
+@@ -144,6 +177,23 @@ def report(run):
+         lines.append(f"| {LABELS[row['model']]} | {row['selection']} | {row['ndcg@10']:.4f} | {row['ndcg@50']:.4f} |")
+     lines += ["", "All paper targets and per-metric differences are included in comparison.csv.",
+               "Reference: https://arxiv.org/html/2407.15462v3#S4.T3", ""]
++    policy = manifest.get("paper_verification", {})
++    if policy.get("required"):
++        lines += ["## Table 3 reproduction check", "",
++                  f"Declared band: ±{100*policy['absolute_tolerance']:.2f} percentage points for each final HR@1, HR@10, HR@50, HR@200 and MRR. This is a practical check, not a statistical confidence interval.",
++                  "SASRec + MoL must also improve HR@10 and HR@50 over SASRec. Baselines retain their released all-position configurations; LCAR uses full-prefix supervision.", "",
++                  "| Model | Final-check status | Largest absolute metric difference (pp) |",
++                  "|---|---|---:|"]
++        for name in manifest.get("models", {}):
++            if name not in TARGETS:
++                continue
++            result = policy.get("results", {}).get(name)
++            lines.append(f"| {LABELS[name]} | {'PASS' if result['passed'] else 'FAIL'} | {100*max(abs(x) for x in result['deltas'].values()):.3f} |"
++                         if result else f"| {LABELS[name]} | pending | — |")
++        gain = policy.get("sasrec_mol_gain")
++        if gain:
++            lines += ["", f"MoL gain check: {'PASS' if gain['passed'] else 'FAIL'}; "
++                      f"ΔHR@10={100*gain['gains']['hr@10']:+.3f} pp, ΔHR@50={100*gain['gains']['hr@50']:+.3f} pp.", ""]
+     lcar_rows = [row for row in rows if MODEL_SPECS[row["model"]].scorer == "LCAR"]
+     if lcar_rows:
+         lines += ["## LCAR comparison against paper Table 3", "",
+@@ -183,6 +233,7 @@ def resume(run):
+     with (run / "resume.lock").open("a") as lock:
+         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+         manifest = json.loads((run / "manifest.json").read_text())
++        expected_epochs = manifest.get("num_epochs", 101)
+         for relative, expected in manifest["data_sha256"].items():
+             if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != expected:
+                 raise ValueError(f"Dataset changed since the original run: {relative}")
+@@ -216,11 +267,11 @@ def resume(run):
+                 epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()] if epochs_path.exists() else []
+                 if [row["epoch"] for row in epochs] != list(range(len(epochs))):
+                     raise ValueError(f"Non-contiguous epoch records for {model}")
+-                if len(epochs) > 101:
++                if len(epochs) > expected_epochs:
+                     raise ValueError(f"Too many epochs for {model}")
+                 manifest.update(status="training", active_model=model)
+                 dump(run / "manifest.json", manifest)
+-                if len(epochs) < 101:
++                if len(epochs) < expected_epochs:
+                     args = [sys.executable, "train.py", f"--gin_config_file={config}", "--master_port=12355"]
+                     if epochs:
+                         checkpoint = folder / "last.pt"
+@@ -229,8 +280,8 @@ def resume(run):
+                         args.append(f"--restore_from_ckpt={checkpoint}")
+                     command(args, run / "logs" / f"{model}_resume_{stamp}.log", env, manifest)
+                     epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()]
+-                if [row["epoch"] for row in epochs] != list(range(101)):
+-                    raise ValueError(f"Expected exactly 101 ordered epochs for {model}")
++                if [row["epoch"] for row in epochs] != list(range(expected_epochs)):
++                    raise ValueError(f"Expected exactly {expected_epochs} ordered epochs for {model}")
+                 manifest["status"] = "verifying_checkpoints"
+                 best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+                 for selection, expected in (("best", best), ("last", epochs[-1])):
+@@ -239,6 +290,7 @@ def resume(run):
+                     for metric in METRICS + EXTRA_METRICS:
+                         if abs(actual["metrics"][metric] - expected["metrics"][metric]) > 1e-5:
+                             raise RuntimeError(f"Checkpoint metric mismatch: {model}/{selection}/{metric}")
++                verify_paper(run, model, actual["metrics"], manifest)
+                 report(run)
+             manifest.update(status="complete", active_model=None)
+         except BaseException as error:
+@@ -258,7 +310,16 @@ def main():
+     parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(DEFAULT_MODELS))
+     parser.add_argument("--supervision-mode", choices=("auto", "all_positions", "sampled_prefix", "full_prefix"), default="auto")
+     parser.add_argument("--ablation", choices=list(ABLATIONS), default="full")
++    parser.add_argument("--epochs", type=int, default=101, help="Training epochs per model (default: 101)")
++    parser.add_argument("--verify-paper", action="store_true", help="Require final baselines to reproduce Table 3 within the declared band")
++    parser.add_argument("--paper-tolerance", type=float, default=.01, help="Absolute per-metric reproduction band (default: .01)")
+     args = parser.parse_args()
++    if args.epochs < 1:
++        parser.error("--epochs must be positive")
++    if not math.isfinite(args.paper_tolerance) or args.paper_tolerance <= 0:
++        parser.error("--paper-tolerance must be finite and positive")
++    if args.verify_paper and (args.epochs != 101 or args.supervision_mode != "auto"):
++        parser.error("--verify-paper requires 101 epochs and the original per-model supervision modes (auto)")
+     run = args.run_dir or ROOT / "playground/benchmark_runs" / datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d-%H%M%S")
+     run = run.resolve()
+     if args.report_only:
+@@ -270,11 +331,15 @@ def main():
+     run.mkdir(parents=True, exist_ok=False)
+     (run / "logs").mkdir()
+     env = dict(os.environ, CUDA_VISIBLE_DEVICES="0", PYTHONUNBUFFERED="1", OMP_NUM_THREADS="8")
+-    manifest = {"run_id": run.name, "status": "preflight", "seed": 42, "commands": [],
++    manifest = {"run_id": run.name, "status": "preflight", "seed": 42, "commands": [], "num_epochs": args.epochs,
+                 "python": sys.version, "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+                 "gpu": subprocess.check_output(["nvidia-smi"], text=True),
+                 "models": {name: asdict(MODEL_SPECS[name]) for name in args.models},
+                 "supervision_override": args.supervision_mode, "ablation": args.ablation,
++                "paper_verification": {"required": args.verify_paper, "absolute_tolerance": args.paper_tolerance,
++                    "selection": "final", "source": "https://arxiv.org/html/2407.15462v3#S4.T3",
++                    "targets": {name: dict(zip(METRICS, TARGETS[name])) for name in args.models if name in TARGETS},
++                    "note": "Practical predeclared band, not a paper confidence interval; require positive SASRec MoL gains at HR@10 and HR@50."},
+                 "data_sha256": {str(p): hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in
+                     [Path("tmp/ml-1m/sasrec_format.csv"), Path("tmp/processed/ml-1m/movies.csv")]},
+                 "deviations": ["Modern uv environment for RTX 5090; original model/optimizer settings retained.",
+@@ -282,6 +347,8 @@ def main():
+                     "Single seed; no independent validation split; final and best evaluation epoch reported separately.",
+                     "Checkpoint evaluator extended to support SASRec and export full metrics."]}
+     dump(run / "manifest.json", manifest)
++    if args.verify_paper:
++        dump(run / "paper_consistency.json", manifest["paper_verification"])
+     (run / "requirements.lock.txt").write_text(subprocess.check_output(
+         ["uv", "pip", "freeze", "--python", sys.executable], text=True))
+     (run / "source.patch").write_text(subprocess.check_output(["git", "diff"], cwd=ROOT, text=True))
+@@ -312,6 +379,7 @@ def main():
+             config.write_text(original.read_text() + "\n" +
+                 f'train_fn.custom_date_str = "benchmark-{run.name}"\n' +
+                 f'train_fn.benchmark_output_dir = "{model_dir}"\n' +
++                f'train_fn.num_epochs = {args.epochs}\n' +
+                 'train_fn.random_seed = 42\ntrain_fn.save_ckpt_every_n = 1\n' +
+                 'create_data_loader.num_workers = 2\ncreate_data_loader.prefetch_factor = 4\n' +
+                 'create_data_loader.persistent_workers = True\n')
+@@ -342,7 +410,7 @@ def main():
+             command([sys.executable, "train.py", f"--gin_config_file={config}", "--master_port=12355"],
+                     run / "logs" / f"{model}_train.log", env, manifest)
+             epochs = [json.loads(line) for line in (run / model / "epochs.jsonl").read_text().splitlines()]
+-            assert len(epochs) == 101, f"Expected 101 epochs for {model}"
++            assert len(epochs) == args.epochs, f"Expected {args.epochs} epochs for {model}"
+             best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+             for selection, expected in [("best", best), ("last", epochs[-1])]:
+                 actual = evaluate(config, run / model / f"{selection}.pt",
+@@ -350,14 +418,15 @@ def main():
+                 for metric in METRICS + EXTRA_METRICS:
+                     if abs(actual["metrics"][metric] - expected["metrics"][metric]) > 1e-5:
+                         raise RuntimeError(f"Checkpoint metric mismatch: {model}/{selection}/{metric}")
++            verify_paper(run, model, actual["metrics"], manifest)
+             report(run)
+-        manifest["status"] = "complete"
++        manifest.update(status="complete", active_model=None)
+     except BaseException as error:
+         manifest.update(status="failed", error=repr(error))
+         raise
+     finally:
+-        report(run)
+         dump(run / "manifest.json", manifest)
++        report(run)
+     print(f"COMPLETE {run}", flush=True)
+ 
+ 
+diff --git a/playground/test_benchmark_resume.py b/playground/test_benchmark_resume.py
+index 36b57e5..676aabe 100644
+--- a/playground/test_benchmark_resume.py
++++ b/playground/test_benchmark_resume.py
+@@ -15,6 +15,32 @@ def epoch_row(epoch):
+ 
+ 
+ class ResumeTests(unittest.TestCase):
++    def test_paper_check_accepts_close_baselines_and_positive_mol_gains(self):
++        with tempfile.TemporaryDirectory() as directory:
++            run = Path(directory)
++            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .01}}
++            for name in ("sasrec", "sasrec_mol"):
++                metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS[name]))
++                metrics["hr@10"] -= .003
++                benchmark.verify_paper(run, name, metrics, manifest)
++            policy = json.loads((run / "paper_consistency.json").read_text())
++            self.assertTrue(all(row["passed"] for row in policy["results"].values()))
++            self.assertTrue(policy["sasrec_mol_gain"]["passed"])
++
++    def test_paper_check_rejects_metric_drift_and_reversed_mol_gain(self):
++        with tempfile.TemporaryDirectory() as directory:
++            run = Path(directory)
++            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .01}}
++            metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS["sasrec"]))
++            metrics["mrr"] -= .02
++            with self.assertRaisesRegex(RuntimeError, "consistency check failed"):
++                benchmark.verify_paper(run, "sasrec", metrics, manifest)
++            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .1}}
++            metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS["sasrec"]))
++            benchmark.verify_paper(run, "sasrec", metrics, manifest)
++            with self.assertRaisesRegex(RuntimeError, "consistency check failed"):
++                benchmark.verify_paper(run, "sasrec_mol", metrics, manifest)
++
+     def test_resume_preserves_completed_epochs_and_runs_queued_model(self):
+         with tempfile.TemporaryDirectory() as directory:
+             run = Path(directory)

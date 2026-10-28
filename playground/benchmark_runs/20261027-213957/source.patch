@@ -1,0 +1,110 @@
+diff --git a/playground/run_ml1m_benchmark.py b/playground/run_ml1m_benchmark.py
+index 8b47d9e..afaa914 100644
+--- a/playground/run_ml1m_benchmark.py
++++ b/playground/run_ml1m_benchmark.py
+@@ -71,6 +71,9 @@ def evaluate(config, checkpoint, output, env, manifest, model_name):
+ 
+ 
+ def report(run):
++    manifest_path = run / "manifest.json"
++    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
++    expected_epochs = manifest.get("num_epochs", 101)
+     rows = []
+     for model in MODELS:
+         epochs_file = run / model / "epochs.jsonl"
+@@ -78,7 +81,7 @@ def report(run):
+             continue
+         epochs = [json.loads(line) for line in epochs_file.read_text().splitlines()]
+         best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+-        last_selection = "final" if len(epochs) == 101 else "latest_incomplete"
++        last_selection = "final" if len(epochs) == expected_epochs else "latest_incomplete"
+         for selection, row in [(last_selection, epochs[-1]), ("best_eval_hr10", best)]:
+             rows.append({"model": model, "selection": selection, "epoch": row["epoch"],
+                          "epochs_completed": len(epochs), **{m: row["metrics"][m] for m in METRICS},
+@@ -99,6 +102,7 @@ def report(run):
+         writer.writerows(rows)
+     lines = ["# ML-1M benchmark results", "",
+              "Seed 42; supplied configurations; full-catalog exact scoring.",
++             f"Scheduled training budget: {expected_epochs} epochs per model.",
+              "Prefix and all-position supervision have different target exposure; compare matched protocols.",
+              "Best epoch is selected on the evaluation set, not an independent validation set.",
+              "Epoch numbers are zero-based. Training time includes evaluation and checkpoint saving.",
+@@ -107,6 +111,8 @@ def report(run):
+              "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+     if any(row["selection"] == "latest_incomplete" for row in rows):
+         lines[2:2] = ["**Training is in progress. Partial metrics are not final benchmark results.**", ""]
++    if expected_epochs < 101:
++        lines[2:2] = ["**Short-run comparison: early-training results, without a convergence claim. Paper rows use a different training budget.**", ""]
+     manifest_path = run / "manifest.json"
+     if manifest_path.exists():
+         manifest = json.loads(manifest_path.read_text())
+@@ -183,6 +189,7 @@ def resume(run):
+     with (run / "resume.lock").open("a") as lock:
+         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+         manifest = json.loads((run / "manifest.json").read_text())
++        expected_epochs = manifest.get("num_epochs", 101)
+         for relative, expected in manifest["data_sha256"].items():
+             if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != expected:
+                 raise ValueError(f"Dataset changed since the original run: {relative}")
+@@ -216,11 +223,11 @@ def resume(run):
+                 epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()] if epochs_path.exists() else []
+                 if [row["epoch"] for row in epochs] != list(range(len(epochs))):
+                     raise ValueError(f"Non-contiguous epoch records for {model}")
+-                if len(epochs) > 101:
++                if len(epochs) > expected_epochs:
+                     raise ValueError(f"Too many epochs for {model}")
+                 manifest.update(status="training", active_model=model)
+                 dump(run / "manifest.json", manifest)
+-                if len(epochs) < 101:
++                if len(epochs) < expected_epochs:
+                     args = [sys.executable, "train.py", f"--gin_config_file={config}", "--master_port=12355"]
+                     if epochs:
+                         checkpoint = folder / "last.pt"
+@@ -229,8 +236,8 @@ def resume(run):
+                         args.append(f"--restore_from_ckpt={checkpoint}")
+                     command(args, run / "logs" / f"{model}_resume_{stamp}.log", env, manifest)
+                     epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()]
+-                if [row["epoch"] for row in epochs] != list(range(101)):
+-                    raise ValueError(f"Expected exactly 101 ordered epochs for {model}")
++                if [row["epoch"] for row in epochs] != list(range(expected_epochs)):
++                    raise ValueError(f"Expected exactly {expected_epochs} ordered epochs for {model}")
+                 manifest["status"] = "verifying_checkpoints"
+                 best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+                 for selection, expected in (("best", best), ("last", epochs[-1])):
+@@ -258,7 +265,10 @@ def main():
+     parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(DEFAULT_MODELS))
+     parser.add_argument("--supervision-mode", choices=("auto", "all_positions", "sampled_prefix", "full_prefix"), default="auto")
+     parser.add_argument("--ablation", choices=list(ABLATIONS), default="full")
++    parser.add_argument("--epochs", type=int, default=101, help="Training epochs per model (default: 101)")
+     args = parser.parse_args()
++    if args.epochs < 1:
++        parser.error("--epochs must be positive")
+     run = args.run_dir or ROOT / "playground/benchmark_runs" / datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d-%H%M%S")
+     run = run.resolve()
+     if args.report_only:
+@@ -270,7 +280,7 @@ def main():
+     run.mkdir(parents=True, exist_ok=False)
+     (run / "logs").mkdir()
+     env = dict(os.environ, CUDA_VISIBLE_DEVICES="0", PYTHONUNBUFFERED="1", OMP_NUM_THREADS="8")
+-    manifest = {"run_id": run.name, "status": "preflight", "seed": 42, "commands": [],
++    manifest = {"run_id": run.name, "status": "preflight", "seed": 42, "commands": [], "num_epochs": args.epochs,
+                 "python": sys.version, "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+                 "gpu": subprocess.check_output(["nvidia-smi"], text=True),
+                 "models": {name: asdict(MODEL_SPECS[name]) for name in args.models},
+@@ -312,6 +322,7 @@ def main():
+             config.write_text(original.read_text() + "\n" +
+                 f'train_fn.custom_date_str = "benchmark-{run.name}"\n' +
+                 f'train_fn.benchmark_output_dir = "{model_dir}"\n' +
++                f'train_fn.num_epochs = {args.epochs}\n' +
+                 'train_fn.random_seed = 42\ntrain_fn.save_ckpt_every_n = 1\n' +
+                 'create_data_loader.num_workers = 2\ncreate_data_loader.prefetch_factor = 4\n' +
+                 'create_data_loader.persistent_workers = True\n')
+@@ -342,7 +353,7 @@ def main():
+             command([sys.executable, "train.py", f"--gin_config_file={config}", "--master_port=12355"],
+                     run / "logs" / f"{model}_train.log", env, manifest)
+             epochs = [json.loads(line) for line in (run / model / "epochs.jsonl").read_text().splitlines()]
+-            assert len(epochs) == 101, f"Expected 101 epochs for {model}"
++            assert len(epochs) == args.epochs, f"Expected {args.epochs} epochs for {model}"
+             best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+             for selection, expected in [("best", best), ("last", epochs[-1])]:
+                 actual = evaluate(config, run / model / f"{selection}.pt",

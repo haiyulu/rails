@@ -1,0 +1,187 @@
+{
+  "run_id": "20261027-213957",
+  "status": "complete",
+  "seed": 42,
+  "commands": [
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "playground/validate_ml1m_benchmark.py"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/validation.log",
+      "started": 1793162397.277707,
+      "pid": 1239803,
+      "returncode": 0,
+      "duration_seconds": 5.174765586853027
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_smoke.log",
+      "started": 1793162402.4530153,
+      "pid": 1239909,
+      "returncode": 0,
+      "duration_seconds": 15.075796604156494
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec_lcar/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_smoke.log",
+      "started": 1793162417.5297036,
+      "pid": 1240123,
+      "returncode": 0,
+      "duration_seconds": 15.07525110244751
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec/sasrec-sampled-softmax-n128-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_train.log",
+      "started": 1793162432.605772,
+      "pid": 1240299,
+      "returncode": 0,
+      "duration_seconds": 27.678447723388672
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec/best.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_best_metrics.log",
+      "started": 1793162460.2846832,
+      "pid": 1240580,
+      "returncode": 0,
+      "duration_seconds": 16.426766395568848
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec/last.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_last_metrics.log",
+      "started": 1793162476.7119389,
+      "pid": 1240764,
+      "returncode": 0,
+      "duration_seconds": 16.42857599258423
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec_lcar/sasrec-lcar.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_train.log",
+      "started": 1793162493.141452,
+      "pid": 1240929,
+      "returncode": 0,
+      "duration_seconds": 76.33329582214355
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec_lcar/best.pt",
+        "--top_k_method=LearnedBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_best_metrics.log",
+      "started": 1793162569.4753711,
+      "pid": 1241551,
+      "returncode": 0,
+      "duration_seconds": 28.010408639907837
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/sasrec_lcar/last.pt",
+        "--top_k_method=LearnedBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-213957/logs/sasrec_lcar_last_metrics.log",
+      "started": 1793162597.4863217,
+      "pid": 1241793,
+      "returncode": 0,
+      "duration_seconds": 27.495961904525757
+    }
+  ],
+  "num_epochs": 3,
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "revision": "df82002599a0a29a40fe95e27abf2cf1a6b0a40c",
+  "gpu": "Tue Oct 27 21:39:57 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 595.112.07             Driver Version: 595.112.07     CUDA Version: 13.2     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 5090        Off |   00000000:01:00.0 Off |                  N/A |\n|  0%   34C    P8             14W /  600W |     911MiB /  32607MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A            1828      G   /usr/lib/xorg/Xorg                      512MiB |\n|    0   N/A  N/A            2124      G   /usr/bin/gnome-shell                     14MiB |\n|    0   N/A  N/A            4550      G   ...rack-uuid=3190708988185955192        139MiB |\n|    0   N/A  N/A           12101      G   ...rack-uuid=3190708988185955192        172MiB |\n+-----------------------------------------------------------------------------------------+\n",
+  "models": {
+    "sasrec": {
+      "config": "sasrec-sampled-softmax-n128-final.gin",
+      "label": "SASRec",
+      "backbone": "SASRec",
+      "scorer": "DotProduct",
+      "exact_top_k": "MIPSBruteForceTopK",
+      "inference_adapter": "dot_product",
+      "supervision_mode": "all_positions"
+    },
+    "sasrec_lcar": {
+      "config": "sasrec-lcar.gin",
+      "label": "LCAR-SASRec",
+      "backbone": "SASRec",
+      "scorer": "LCAR",
+      "exact_top_k": "LearnedBruteForceTopK",
+      "inference_adapter": "lcar",
+      "supervision_mode": "full_prefix"
+    }
+  },
+  "supervision_override": "full_prefix",
+  "ablation": "full",
+  "data_sha256": {
+    "tmp/ml-1m/sasrec_format.csv": "2582a9946b0fa5b96e393f03cb0cd5f22e8977d93ccef99aff2b3e06863912de",
+    "tmp/processed/ml-1m/movies.csv": "efdbb1859c29c6699bc544e0e27b6d69c452216268b1dd41eaaef7a755e3349e"
+  },
+  "deviations": [
+    "Modern uv environment for RTX 5090; original model/optimizer settings retained.",
+    "Two persistent data workers with prefetch factor 4; original iterator RNG draws preserved.",
+    "Single seed; no independent validation split; final and best evaluation epoch reported separately.",
+    "Checkpoint evaluator extended to support SASRec and export full metrics."
+  ],
+  "active_model": "sasrec_lcar"
+}

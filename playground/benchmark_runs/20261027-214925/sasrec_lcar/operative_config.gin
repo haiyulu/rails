@@ -1,0 +1,83 @@
+# Parameters for create_data_loader:
+# ==============================================================================
+create_data_loader.num_workers = 2
+create_data_loader.persistent_workers = True
+create_data_loader.prefetch_factor = 4
+
+# Parameters for create_lcar_interaction_module:
+# ==============================================================================
+create_lcar_interaction_module.attention_dim = 32
+create_lcar_interaction_module.dictionary_size = 128
+create_lcar_interaction_module.events_per_slot = 16
+create_lcar_interaction_module.hidden_dim = 64
+create_lcar_interaction_module.latent_chunk_size = 128
+create_lcar_interaction_module.max_active_latents = 16
+create_lcar_interaction_module.memory_dim = 32
+create_lcar_interaction_module.num_item_experts = 4
+create_lcar_interaction_module.recent_events = 32
+create_lcar_interaction_module.sparse_coding_steps = 8
+create_lcar_interaction_module.sparse_l1_weight = 0.01
+create_lcar_interaction_module.use_global_token = True
+create_lcar_interaction_module.use_selected_tokens = True
+create_lcar_interaction_module.use_source_embeddings = True
+create_lcar_interaction_module.use_summary_tokens = True
+create_lcar_interaction_module.value_dim = 32
+
+# Parameters for get_sequential_encoder:
+# ==============================================================================
+get_sequential_encoder.activation_checkpoint = False
+
+# Parameters for get_similarity_function:
+# ==============================================================================
+get_similarity_function.activation_checkpoint = False
+get_similarity_function.bf16_training = False
+
+# Parameters for sasrec_encoder:
+# ==============================================================================
+sasrec_encoder.ffn_activation_fn = 'relu'
+sasrec_encoder.ffn_dropout_rate = 0.2
+sasrec_encoder.ffn_hidden_dim = 50
+sasrec_encoder.num_blocks = 2
+sasrec_encoder.num_heads = 1
+
+# Parameters for train_fn:
+# ==============================================================================
+train_fn.benchmark_output_dir = \
+    '/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_lcar'
+train_fn.custom_date_str = 'benchmark-20261027-214925'
+train_fn.dataset_name = 'ml-1m'
+train_fn.dropout_rate = 0.2
+train_fn.embedding_module_type = 'local'
+train_fn.enable_tf32 = True
+train_fn.eval_batch_size = 128
+train_fn.eval_bf16 = False
+train_fn.eval_interval = 100
+train_fn.eval_user_max_batch_size = None
+train_fn.full_eval_every_n = 1
+train_fn.gr_output_length = 10
+train_fn.interaction_module_type = 'LCAR'
+train_fn.item_embedding_dim = 50
+train_fn.item_l2_norm = True
+train_fn.l2_norm_eps = 1e-06
+train_fn.learning_rate = 0.001
+train_fn.local_batch_size = 128
+train_fn.loss_activation_checkpoint = False
+train_fn.loss_module = 'SampledSoftmaxLoss'
+train_fn.loss_weights = {'sparse_code_loss': 0.1}
+train_fn.main_module = 'SASRec'
+train_fn.main_module_bf16 = False
+train_fn.max_sequence_length = 200
+train_fn.num_epochs = 101
+train_fn.num_negatives = 128
+train_fn.num_warmup_steps = 0
+train_fn.partial_eval_num_iters = 32
+train_fn.positional_sampling_ratio = 1.0
+train_fn.random_seed = 42
+train_fn.sampling_strategy = 'local'
+train_fn.save_ckpt_every_n = 1
+train_fn.smoke_steps = 0
+train_fn.supervision_mode = 'full_prefix'
+train_fn.temperature = 1.0
+train_fn.top_k_method = 'LearnedBruteForceTopK'
+train_fn.user_embedding_norm = 'l2_norm'
+train_fn.weight_decay = 0

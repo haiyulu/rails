@@ -15,6 +15,32 @@ def epoch_row(epoch):
 
 
 class ResumeTests(unittest.TestCase):
+    def test_paper_check_accepts_close_baselines_and_positive_mol_gains(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .01}}
+            for name in ("sasrec", "sasrec_mol"):
+                metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS[name]))
+                metrics["hr@10"] -= .003
+                benchmark.verify_paper(run, name, metrics, manifest)
+            policy = json.loads((run / "paper_consistency.json").read_text())
+            self.assertTrue(all(row["passed"] for row in policy["results"].values()))
+            self.assertTrue(policy["sasrec_mol_gain"]["passed"])
+
+    def test_paper_check_rejects_metric_drift_and_reversed_mol_gain(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .01}}
+            metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS["sasrec"]))
+            metrics["mrr"] -= .02
+            with self.assertRaisesRegex(RuntimeError, "consistency check failed"):
+                benchmark.verify_paper(run, "sasrec", metrics, manifest)
+            manifest = {"paper_verification": {"required": True, "absolute_tolerance": .1}}
+            metrics = dict(zip(benchmark.METRICS, benchmark.TARGETS["sasrec"]))
+            benchmark.verify_paper(run, "sasrec", metrics, manifest)
+            with self.assertRaisesRegex(RuntimeError, "consistency check failed"):
+                benchmark.verify_paper(run, "sasrec_mol", metrics, manifest)
+
     def test_resume_preserves_completed_epochs_and_runs_queued_model(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

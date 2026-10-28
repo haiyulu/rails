@@ -1,0 +1,344 @@
+{
+  "run_id": "20261027-214925",
+  "status": "complete",
+  "seed": 42,
+  "commands": [
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "playground/validate_ml1m_benchmark.py"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/validation.log",
+      "started": 1793162965.3588426,
+      "pid": 1244599,
+      "returncode": 0,
+      "duration_seconds": 5.283736228942871
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_smoke.log",
+      "started": 1793162970.6432025,
+      "pid": 1244717,
+      "returncode": 0,
+      "duration_seconds": 15.025143146514893
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_mol/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_smoke.log",
+      "started": 1793162985.6693358,
+      "pid": 1244967,
+      "returncode": 0,
+      "duration_seconds": 18.432534217834473
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_lcar/smoke.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_smoke.log",
+      "started": 1793163004.1024988,
+      "pid": 1245206,
+      "returncode": 0,
+      "duration_seconds": 14.97516942024231
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec/sasrec-sampled-softmax-n128-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_train.log",
+      "started": 1793163019.0781648,
+      "pid": 1245390,
+      "returncode": 0,
+      "duration_seconds": 118.8437659740448
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec/best.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_best_metrics.log",
+      "started": 1793163137.927966,
+      "pid": 1246466,
+      "returncode": 0,
+      "duration_seconds": 16.477917194366455
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec/last.pt",
+        "--top_k_method=MIPSBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_last_metrics.log",
+      "started": 1793163154.4064248,
+      "pid": 1246649,
+      "returncode": 0,
+      "duration_seconds": 16.429628133773804
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_mol/sasrec-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_train.log",
+      "started": 1793163170.8397472,
+      "pid": 1246808,
+      "returncode": 0,
+      "duration_seconds": 454.1789376735687
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_mol/best.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_best_metrics.log",
+      "started": 1793163625.0211582,
+      "pid": 1252066,
+      "returncode": 0,
+      "duration_seconds": 19.486599683761597
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_mol/last.pt",
+        "--top_k_method=MoLBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_mol_last_metrics.log",
+      "started": 1793163644.5083795,
+      "pid": 1252359,
+      "returncode": 0,
+      "duration_seconds": 19.436496257781982
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "train.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_lcar/sasrec-lcar.gin",
+        "--master_port=12355"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_train.log",
+      "started": 1793163663.9486578,
+      "pid": 1252649,
+      "returncode": 0,
+      "duration_seconds": 1781.7613096237183
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_best_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_lcar/best.pt",
+        "--top_k_method=LearnedBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_best_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_best_metrics.log",
+      "started": 1793165445.7116592,
+      "pid": 1269714,
+      "returncode": 0,
+      "duration_seconds": 28.03761339187622
+    },
+    {
+      "command": [
+        "/home/hylu/hylucode/research/rails/.venv/bin/python",
+        "eval_from_checkpoint.py",
+        "--gin_config_file=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_last_metrics.gin",
+        "--inference_from_ckpt=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/sasrec_lcar/last.pt",
+        "--top_k_method=LearnedBruteForceTopK",
+        "--eval_batch_size=128",
+        "--limit_eval_to_first_n=0",
+        "--include_eval_time=false",
+        "--eval_against_brute_force=false",
+        "--metrics_output=/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_last_metrics.json",
+        "--master_port=12356"
+      ],
+      "log": "/home/hylu/hylucode/research/rails/playground/benchmark_runs/20261027-214925/logs/sasrec_lcar_last_metrics.log",
+      "started": 1793165473.7499356,
+      "pid": 1269987,
+      "returncode": 0,
+      "duration_seconds": 27.551692008972168
+    }
+  ],
+  "num_epochs": 101,
+  "python": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4 ]",
+  "revision": "df82002599a0a29a40fe95e27abf2cf1a6b0a40c",
+  "gpu": "Tue Oct 27 21:49:25 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 595.112.07             Driver Version: 595.112.07     CUDA Version: 13.2     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 5090        Off |   00000000:01:00.0 Off |                  N/A |\n|  0%   40C    P8             13W /  600W |     911MiB /  32607MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A            1828      G   /usr/lib/xorg/Xorg                      512MiB |\n|    0   N/A  N/A            2124      G   /usr/bin/gnome-shell                     14MiB |\n|    0   N/A  N/A            4550      G   ...rack-uuid=3190708988185955192        139MiB |\n|    0   N/A  N/A           12101      G   ...rack-uuid=3190708988185955192        172MiB |\n+-----------------------------------------------------------------------------------------+\n",
+  "models": {
+    "sasrec": {
+      "config": "sasrec-sampled-softmax-n128-final.gin",
+      "label": "SASRec",
+      "backbone": "SASRec",
+      "scorer": "DotProduct",
+      "exact_top_k": "MIPSBruteForceTopK",
+      "inference_adapter": "dot_product",
+      "supervision_mode": "all_positions"
+    },
+    "sasrec_mol": {
+      "config": "sasrec-mol-sampled-softmax-n128-8x4x64-rails-final.gin",
+      "label": "SASRec + MoL",
+      "backbone": "SASRec",
+      "scorer": "MoL",
+      "exact_top_k": "MoLBruteForceTopK",
+      "inference_adapter": "mol",
+      "supervision_mode": "all_positions"
+    },
+    "sasrec_lcar": {
+      "config": "sasrec-lcar.gin",
+      "label": "LCAR-SASRec",
+      "backbone": "SASRec",
+      "scorer": "LCAR",
+      "exact_top_k": "LearnedBruteForceTopK",
+      "inference_adapter": "lcar",
+      "supervision_mode": "full_prefix"
+    }
+  },
+  "supervision_override": "auto",
+  "ablation": "full",
+  "paper_verification": {
+    "required": true,
+    "absolute_tolerance": 0.01,
+    "selection": "final",
+    "source": "https://arxiv.org/html/2407.15462v3#S4.T3",
+    "targets": {
+      "sasrec": {
+        "hr@1": 0.061,
+        "hr@10": 0.2818,
+        "hr@50": 0.547,
+        "hr@200": 0.754,
+        "mrr": 0.1352
+      },
+      "sasrec_mol": {
+        "hr@1": 0.0697,
+        "hr@10": 0.3036,
+        "hr@50": 0.5617,
+        "hr@200": 0.7667,
+        "mrr": 0.1441
+      }
+    },
+    "note": "Practical predeclared band, not a paper confidence interval; require positive SASRec MoL gains at HR@10 and HR@50.",
+    "results": {
+      "sasrec": {
+        "selection": "final",
+        "metrics": {
+          "hr@1": 0.06142384186387062,
+          "hr@10": 0.2750000059604645,
+          "hr@50": 0.5509933829307556,
+          "hr@200": 0.7538079619407654,
+          "mrr": 0.13145501911640167
+        },
+        "targets": {
+          "hr@1": 0.061,
+          "hr@10": 0.2818,
+          "hr@50": 0.547,
+          "hr@200": 0.754,
+          "mrr": 0.1352
+        },
+        "deltas": {
+          "hr@1": 0.00042384186387062206,
+          "hr@10": -0.006799994039535517,
+          "hr@50": 0.0039933829307555735,
+          "hr@200": -0.0001920380592346227,
+          "mrr": -0.0037449808835983145
+        },
+        "passed": true
+      },
+      "sasrec_mol": {
+        "selection": "final",
+        "metrics": {
+          "hr@1": 0.07218542695045471,
+          "hr@10": 0.2996688783168793,
+          "hr@50": 0.5683774948120117,
+          "hr@200": 0.7657284736633301,
+          "mrr": 0.14540259540081024
+        },
+        "targets": {
+          "hr@1": 0.0697,
+          "hr@10": 0.3036,
+          "hr@50": 0.5617,
+          "hr@200": 0.7667,
+          "mrr": 0.1441
+        },
+        "deltas": {
+          "hr@1": 0.002485426950454714,
+          "hr@10": -0.0039311216831207085,
+          "hr@50": 0.006677494812011742,
+          "hr@200": -0.00097152633666997,
+          "mrr": 0.0013025954008102358
+        },
+        "passed": true
+      }
+    },
+    "sasrec_mol_gain": {
+      "gains": {
+        "hr@10": 0.024668872356414795,
+        "hr@50": 0.017384111881256104
+      },
+      "passed": true
+    }
+  },
+  "data_sha256": {
+    "tmp/ml-1m/sasrec_format.csv": "2582a9946b0fa5b96e393f03cb0cd5f22e8977d93ccef99aff2b3e06863912de",
+    "tmp/processed/ml-1m/movies.csv": "efdbb1859c29c6699bc544e0e27b6d69c452216268b1dd41eaaef7a755e3349e"
+  },
+  "deviations": [
+    "Modern uv environment for RTX 5090; original model/optimizer settings retained.",
+    "Two persistent data workers with prefetch factor 4; original iterator RNG draws preserved.",
+    "Single seed; no independent validation split; final and best evaluation epoch reported separately.",
+    "Checkpoint evaluator extended to support SASRec and export full metrics."
+  ],
+  "active_model": null
+}
