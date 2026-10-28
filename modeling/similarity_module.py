@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import abc
-from dataclasses import replace
-import weakref
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -32,82 +30,26 @@ class SequentialEncoderWithLearnedSimilarityModule(torch.nn.Module):
         self._ndp_module: SimilarityModule = ndp_module
 
     def history_version(self):
-        # Scorer-owned dictionary atoms now participate in sequence contextualization.
-        if getattr(self._ndp_module, "requires_user_memory", False) and any(
-                p.is_inference() for p in self.parameters()):
-            family=getattr(self._ndp_module,'scorer_type','history')
-            raise ValueError(f"Construct and move {family} parameters outside inference_mode for versioned caches")
-        parameters=(p for name,p in self.named_parameters()
-                    if not (getattr(self._ndp_module,'uses_appended_latents',False)
-                            and name.startswith('_ndp_module.')))
+        """Version only the native user encoder/lookup, independently of its scorer."""
         return (id(self), self.training,
                 tuple((id(p), None if p.is_inference() else p._version, p.device, p.dtype)
-                      for p in parameters))
+                      for name, p in self.named_parameters()
+                      if not name.startswith("_ndp_module.")))
 
-    def initialize_history_adapters(self, num_blocks, hidden_dim):
-        from modeling.sequential.latent_attention import LatentDictionaryAttention
-        scorer = self._ndp_module
-        self._history_adapters = torch.nn.ModuleList()
-        if getattr(scorer, "latent_conditioned_history", False):
-            self._history_adapters.extend([
-                LatentDictionaryAttention(hidden_dim, scorer.attention_dim,
-                    scorer.dictionary_attention_dim, scorer.dictionary_attention_heads,
-                    scorer.dictionary_gate_init)
-                for _ in range(num_blocks)])
-
-    def prepare_history_context(self):
-        if not getattr(self._ndp_module, "requires_user_memory", False):
-            return None
-        context = self._ndp_module.prepare_model()
-        # In evaluation, layer-owned projections are cached; training stays differentiable.
-        if not self.training and not torch.is_grad_enabled():
-            for adapter in self._history_adapters:
-                adapter.prepare_dictionary(context.atoms)
-        return context
-
-    def prepare_original_history(self, embeddings, past_lengths, past_ids, past_payloads, context):
-        if context is None:
-            return None
-        if embeddings.shape[:2] != past_ids.shape:
-            raise ValueError("ExpertHistory requires one pre-block embedding per event")
-        positions = torch.arange(past_ids.shape[1], device=past_ids.device)
-        valid = (positions[None, :] < past_lengths[:, None]) & (past_ids != 0)
-        payloads = dict(past_payloads, item_ids=past_ids)
-        return self._ndp_module.prepare_raw_history(embeddings, valid, payloads, context)
-
-    def prepare_history(self, encoded_embeddings, past_lengths, past_ids, past_payloads,
-                        raw_history=None, history_context=None):
-        """Prepare one explicit state for a causal prefix, never a candidate-dependent cache."""
-        if encoded_embeddings.shape[:2] != past_ids.shape:
-            raise ValueError("History memory requires one encoder state per event")
-        positions = torch.arange(past_ids.shape[1], device=past_ids.device)
-        valid = (positions[None, :] < past_lengths[:, None]) & (past_ids != 0)
-        last = (past_lengths - 1).clamp_min(0)
-        current = encoded_embeddings[torch.arange(past_ids.shape[0], device=past_ids.device), last]
-        current = current * (past_lengths > 0).unsqueeze(-1)
-        memory = None
-        if getattr(self._ndp_module, "requires_user_memory", False):
-            if raw_history is None or history_context is None:
-                family=getattr(self._ndp_module,'scorer_type','history')
-                raise ValueError(f"{family} requires prepared encoder output and model context")
-            memory = self._ndp_module.finish_user_memory(raw_history, encoded_embeddings, valid,
-                                                        history_context,
-                                                        event_payloads=dict(past_payloads,item_ids=past_ids))
-            memory = replace(memory, encoder_ref=weakref.ref(self), encoder_version=self.history_version())
-        return current, memory
+    def prepare_history(self, states, lengths):
+        last = (lengths - 1).clamp_min(0)
+        current = states[torch.arange(lengths.shape[0], device=states.device), last]
+        return current * (lengths > 0).unsqueeze(-1), None
 
     def encode_with_history(self, past_lengths, past_ids, past_embeddings, past_payloads):
-        states, raw, context = self.forward(past_lengths, past_ids, past_embeddings, past_payloads,
-                                            return_history=True)
-        return self.prepare_history(states, past_lengths, past_ids, past_payloads, raw, context)
+        states = self.forward(past_lengths, past_ids, past_embeddings, past_payloads)
+        return self.prepare_history(states, past_lengths)
 
-    def sampled_prefix_loss(self, states, past_lengths, past_ids, past_payloads,
-                            sampled_targets, negatives_sampler, sampled_loss,
-                            raw_history=None, history_context=None):
-        current, memory = self.prepare_history(states, past_lengths, past_ids, past_payloads,
-                                               raw_history, history_context)
-        return sampled_loss.prefix_forward(current, sampled_targets, negatives_sampler,
-                                           user_memory=memory, **past_payloads)
+    def prefix_loss(self, states, past_lengths, past_payloads,
+                    prefix_targets, negatives_sampler, sampled_loss):
+        current, _ = self.prepare_history(states, past_lengths)
+        return sampled_loss.prefix_forward(
+            current, prefix_targets, negatives_sampler, **past_payloads)
 
     @abc.abstractmethod
     def debug_str(

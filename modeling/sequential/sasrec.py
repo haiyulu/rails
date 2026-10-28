@@ -152,8 +152,6 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
             ),
         )
         self.reset_state()
-        # Construct after the backbone reset so the small nonzero gates retain their initialization.
-        self.initialize_history_adapters(num_blocks, embedding_dim)
 
     def reset_state(self) -> None:
         for name, params in self.named_parameters():
@@ -194,11 +192,7 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
         i: int,
         user_embeddings: torch.Tensor,
         valid_mask: torch.Tensor,
-        dictionary_atoms=None,
     ) -> torch.Tensor:
-        if dictionary_atoms is not None and self._history_adapters:
-            user_embeddings = self._history_adapters[i](user_embeddings, dictionary_atoms,
-                                                        valid_mask.squeeze(-1).bool())
         Q = F.layer_norm(
             user_embeddings,
             normalized_shape=(self._embedding_dim,),
@@ -226,7 +220,6 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
         past_ids: torch.Tensor,
         past_embeddings: torch.Tensor,
         past_payloads: Dict[str, torch.Tensor],
-        return_history: bool = False,
     ) -> torch.Tensor:
         """
         Args:
@@ -235,25 +228,12 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
         Returns:
             (B, N, D,) x float
         """
-        if getattr(self._ndp_module,'uses_appended_latents',False):
-            encoded=self._ndp_module.encode_history(self,past_lengths,past_ids,past_embeddings,past_payloads)
-            return ((encoded.history_states,encoded,encoded.context) if return_history
-                    else encoded.history_states)
         past_lengths, user_embeddings, valid_mask = self._input_features_preproc(
             past_lengths=past_lengths,
             past_ids=past_ids,
             past_embeddings=past_embeddings,
             past_payloads=past_payloads,
         )
-
-        context = self.prepare_history_context()
-        if context is not None:
-            valid_mask = valid_mask * (torch.arange(user_embeddings.shape[1], device=past_lengths.device)
-                                      [None, :, None] < past_lengths[:, None, None])
-            user_embeddings = user_embeddings * valid_mask
-        raw = self.prepare_original_history(user_embeddings, past_lengths, past_ids, past_payloads,
-                                             context) if return_history else None
-        atoms = context.atoms if context is not None else None
 
         for i in range(len(self.attention_layers)):
             if self._activation_checkpoint:
@@ -262,14 +242,12 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
                     i,
                     user_embeddings,
                     valid_mask,
-                    atoms,
                     use_reentrant=False,
                 )
             else:
-                user_embeddings = self._run_one_layer(i, user_embeddings, valid_mask, atoms)
+                user_embeddings = self._run_one_layer(i, user_embeddings, valid_mask)
 
-        states = self._output_postproc(user_embeddings)
-        return (states, raw, context) if return_history else states
+        return self._output_postproc(user_embeddings)
 
     def forward(
         self,
@@ -278,10 +256,9 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
         past_embeddings: torch.Tensor,
         past_payloads: Dict[str, torch.Tensor],
         batch_id: Optional[int] = None,
-        sampled_targets=None,
+        prefix_targets=None,
         negatives_sampler=None,
         sampled_loss=None,
-        return_history: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
@@ -293,17 +270,16 @@ class SASRec(SequentialEncoderWithLearnedSimilarityModule):
         Returns:
             encoded_embeddings of [B, N, D].
         """
-        encoded_embeddings, raw, context = self.generate_user_embeddings(
+        encoded_embeddings = self.generate_user_embeddings(
             past_lengths,
             past_ids,
             past_embeddings,
             past_payloads,
-            return_history=True,
         )
-        if sampled_targets is not None:
-            return self.sampled_prefix_loss(encoded_embeddings, past_lengths, past_ids, past_payloads,
-                                            sampled_targets, negatives_sampler, sampled_loss, raw, context)
-        return (encoded_embeddings, raw, context) if return_history else encoded_embeddings
+        if prefix_targets is not None:
+            return self.prefix_loss(encoded_embeddings, past_lengths, past_payloads,
+                                    prefix_targets, negatives_sampler, sampled_loss)
+        return encoded_embeddings
 
     def encode(
         self,

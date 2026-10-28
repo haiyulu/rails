@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -19,7 +20,7 @@ from dataclasses import asdict
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from playground.model_registry import ABLATIONS, LCAR_ABLATIONS, MODEL_SPECS, MODELS, LABELS, DEFAULT_MODELS
+from playground.model_registry import ABLATIONS, MODEL_SPECS, MODELS, LABELS, DEFAULT_MODELS
 METRICS = ["hr@1", "hr@10", "hr@50", "hr@200", "mrr"]
 EXTRA_METRICS = ["ndcg@10", "ndcg@50"]
 TARGETS = {
@@ -40,7 +41,15 @@ def command(args, log, env, manifest):
     dump(log.parent.parent / "manifest.json", manifest)
     print(f"START {log.name}", flush=True)
     with log.open("w") as out:
-        process = subprocess.run(args, cwd=ROOT, env=env, stdout=out, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(args, cwd=ROOT, env=env, stdout=out, stderr=subprocess.STDOUT)
+        entry["pid"] = process.pid
+        dump(log.parent.parent / "manifest.json", manifest)
+        while True:
+            try:
+                process.wait(timeout=10)
+                break
+            except subprocess.TimeoutExpired:
+                report(log.parent.parent)
     entry.update(returncode=process.returncode, duration_seconds=time.time() - entry["started"])
     dump(log.parent.parent / "manifest.json", manifest)
     if process.returncode:
@@ -69,7 +78,8 @@ def report(run):
             continue
         epochs = [json.loads(line) for line in epochs_file.read_text().splitlines()]
         best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
-        for selection, row in [("final", epochs[-1]), ("best_eval_hr10", best)]:
+        last_selection = "final" if len(epochs) == 101 else "latest_incomplete"
+        for selection, row in [(last_selection, epochs[-1]), ("best_eval_hr10", best)]:
             rows.append({"model": model, "selection": selection, "epoch": row["epoch"],
                          "epochs_completed": len(epochs), **{m: row["metrics"][m] for m in METRICS},
                          **{m: row["metrics"][m] for m in EXTRA_METRICS},
@@ -95,6 +105,17 @@ def report(run):
              "MRR uses the repository's original rank cutoff of 2500.", "",
              "| Model | Selection | Epoch | Epochs completed | HR@1 | HR@10 | HR@50 | HR@200 | MRR |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+    if any(row["selection"] == "latest_incomplete" for row in rows):
+        lines[2:2] = ["**Training is in progress. Partial metrics are not final benchmark results.**", ""]
+    manifest_path = run / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text())
+        updated = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d %I:%M:%S %p %Z")
+        lines[2:2] = [f"Updated: {updated}. Run status: {manifest.get('status', 'unknown')}; "
+                      f"active model: {manifest.get('active_model', 'none')}.", ""]
+        if manifest.get("resumptions"):
+            lines[2:2] = ["Resumed from an epoch-boundary checkpoint. Original checkpoint has no RNG state; "
+                          "model/optimizer state and cumulative resources are retained, while stochastic streams restart.", ""]
     for model in MODELS:
         model_rows = [row for row in rows if row["model"] == model]
         if not model_rows:
@@ -123,21 +144,128 @@ def report(run):
         lines.append(f"| {LABELS[row['model']]} | {row['selection']} | {row['ndcg@10']:.4f} | {row['ndcg@50']:.4f} |")
     lines += ["", "All paper targets and per-metric differences are included in comparison.csv.",
               "Reference: https://arxiv.org/html/2407.15462v3#S4.T3", ""]
+    lcar_rows = [row for row in rows if MODEL_SPECS[row["model"]].scorer == "LCAR"]
+    if lcar_rows:
+        lines += ["## LCAR comparison against paper Table 3", "",
+                  "Paper rows use the published protocol; each run's supervision policy is recorded above and in comparison.csv.",
+                  "Each LCAR epoch presents one target per user, unlike all-position baseline training.",
+                  "These are single-seed experiments; best_eval_hr10 selects on the evaluation set.", "",
+                  "| Model | Selection | HR@1 | HR@10 | HR@50 | HR@200 | MRR |",
+                  "|---|---|---:|---:|---:|---:|---:|"]
+        for name, values in TARGETS.items():
+            lines.append("| " + " | ".join([LABELS[name], "paper"] + [f"{v:.4f}" for v in values]) + " |")
+        for row in lcar_rows:
+            lines.append("| " + " | ".join([LABELS[row["model"]], row["selection"]] +
+                         [f"{row[m]:.4f}" for m in METRICS]) + " |")
+        differences = []
+        lines += ["", "Differences below are LCAR minus the corresponding paper baseline, in percentage points.", "",
+                  "| LCAR model | Selection | Paper baseline | ΔHR@1 | ΔHR@10 | ΔHR@50 | ΔHR@200 | ΔMRR |",
+                  "|---|---|---|---:|---:|---:|---:|---:|"]
+        for row in lcar_rows:
+            backbone = row["model"].removesuffix("_lcar")
+            for reference in (backbone, backbone + "_mol"):
+                deltas = {m: row[m] - value for m, value in zip(METRICS, TARGETS[reference])}
+                differences.append({"model": row["model"], "selection": row["selection"],
+                                    "paper_baseline": reference, **deltas})
+                lines.append("| " + " | ".join([LABELS[row["model"]], row["selection"], LABELS[reference]] +
+                             [f"{100*deltas[m]:+.2f}" for m in METRICS]) + " |")
+        with (run / "lcar_vs_paper.csv").open("w") as f:
+            writer = csv.DictWriter(f, fieldnames=list(differences[0]))
+            writer.writeheader()
+            writer.writerows(differences)
     (run / "comparison.md").write_text("\n".join(lines))
+
+
+def resume(run):
+    """Continue existing model directories without replacing completed epoch records."""
+    import fcntl
+
+    with (run / "resume.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        manifest = json.loads((run / "manifest.json").read_text())
+        for relative, expected in manifest["data_sha256"].items():
+            if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != expected:
+                raise ValueError(f"Dataset changed since the original run: {relative}")
+        hashes = json.loads((run / "source_sha256.json").read_text())
+        for relative, expected in hashes.items():
+            if relative.startswith(("rails/", "modeling/", "trainer/", "data/")):
+                if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != expected:
+                    raise ValueError(f"Model or dataset code changed: {relative}")
+        stamp = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d-%H%M%S")
+        source = run / "resume_source" / stamp
+        source.mkdir(parents=True)
+        for relative in ("train.py", "playground/run_ml1m_benchmark.py"):
+            destination = source / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, destination)
+        manifest.setdefault("resumptions", []).append({"started": time.time(), "pid": os.getpid(),
+            "source": str(source), "rng_state_restored": False,
+            "note": "Original checkpoints retain model/optimizer state but do not contain RNG state."})
+        for entry in manifest["commands"]:
+            if "returncode" not in entry:
+                entry["interrupted_before_resume"] = True
+        manifest.update(status="training", runner_pid=os.getpid())
+        manifest.pop("error", None)
+        dump(run / "manifest.json", manifest)
+        env = dict(os.environ, CUDA_VISIBLE_DEVICES="0", PYTHONUNBUFFERED="1", OMP_NUM_THREADS="8")
+        try:
+            for model in manifest["models"]:
+                folder = run / model
+                config = folder / MODELS[model]
+                epochs_path = folder / "epochs.jsonl"
+                epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()] if epochs_path.exists() else []
+                if [row["epoch"] for row in epochs] != list(range(len(epochs))):
+                    raise ValueError(f"Non-contiguous epoch records for {model}")
+                if len(epochs) > 101:
+                    raise ValueError(f"Too many epochs for {model}")
+                manifest.update(status="training", active_model=model)
+                dump(run / "manifest.json", manifest)
+                if len(epochs) < 101:
+                    args = [sys.executable, "train.py", f"--gin_config_file={config}", "--master_port=12355"]
+                    if epochs:
+                        checkpoint = folder / "last.pt"
+                        if not checkpoint.is_file():
+                            raise ValueError(f"Missing resume checkpoint for {model}")
+                        args.append(f"--restore_from_ckpt={checkpoint}")
+                    command(args, run / "logs" / f"{model}_resume_{stamp}.log", env, manifest)
+                    epochs = [json.loads(line) for line in epochs_path.read_text().splitlines() if line.strip()]
+                if [row["epoch"] for row in epochs] != list(range(101)):
+                    raise ValueError(f"Expected exactly 101 ordered epochs for {model}")
+                manifest["status"] = "verifying_checkpoints"
+                best = max(epochs, key=lambda row: row["metrics"]["hr@10"])
+                for selection, expected in (("best", best), ("last", epochs[-1])):
+                    actual = evaluate(config, folder / f"{selection}.pt",
+                                      run / "logs" / f"{model}_{selection}_metrics.json", env, manifest, model)
+                    for metric in METRICS + EXTRA_METRICS:
+                        if abs(actual["metrics"][metric] - expected["metrics"][metric]) > 1e-5:
+                            raise RuntimeError(f"Checkpoint metric mismatch: {model}/{selection}/{metric}")
+                report(run)
+            manifest.update(status="complete", active_model=None)
+        except BaseException as error:
+            manifest.update(status="failed", error=repr(error))
+            raise
+        finally:
+            dump(run / "manifest.json", manifest)
+            report(run)
+        print(f"COMPLETE {run}", flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--report-only", action="store_true")
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--models", nargs="+", choices=list(MODELS), default=list(DEFAULT_MODELS))
-    parser.add_argument("--supervision-mode", choices=("auto", "all_positions", "sampled_prefix"), default="auto")
+    parser.add_argument("--supervision-mode", choices=("auto", "all_positions", "sampled_prefix", "full_prefix"), default="auto")
     parser.add_argument("--ablation", choices=list(ABLATIONS), default="full")
     args = parser.parse_args()
     run = args.run_dir or ROOT / "playground/benchmark_runs" / datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d-%H%M%S")
     run = run.resolve()
     if args.report_only:
         report(run)
+        return
+    if args.resume:
+        resume(run)
         return
     run.mkdir(parents=True, exist_ok=False)
     (run / "logs").mkdir()
@@ -157,6 +285,21 @@ def main():
     (run / "requirements.lock.txt").write_text(subprocess.check_output(
         ["uv", "pip", "freeze", "--python", sys.executable], text=True))
     (run / "source.patch").write_text(subprocess.check_output(["git", "diff"], cwd=ROOT, text=True))
+    # Include new modules/configs, which an ordinary git diff does not capture.
+    sources = subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode().split("\0")
+    source_hashes = {}
+    for relative in sources:
+        source = ROOT / relative
+        if not relative or source.suffix not in (".py", ".gin", ".md", ".toml") or not source.is_file():
+            continue
+        if relative.startswith("playground/benchmark_runs/") or relative.startswith("playground/inference_flops_runs/"):
+            continue
+        target = run / "source" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        source_hashes[relative] = hashlib.sha256(source.read_bytes()).hexdigest()
+    dump(run / "source_sha256.json", source_hashes)
     try:
         command([sys.executable, "playground/validate_ml1m_benchmark.py"], run / "logs/validation.log", env, manifest)
         configs = {}
@@ -174,15 +317,13 @@ def main():
                 'create_data_loader.persistent_workers = True\n')
             extra = ""
             if args.supervision_mode != "auto":
-                if MODEL_SPECS[model].scorer in ("ExpertHistory","LCAR") and args.supervision_mode != "sampled_prefix":
-                    raise ValueError(f"{MODEL_SPECS[model].scorer} requires sampled_prefix supervision")
+                if MODEL_SPECS[model].scorer == "LCAR" and args.supervision_mode == "all_positions":
+                    raise ValueError(f"{MODEL_SPECS[model].scorer} requires full_prefix or sampled_prefix supervision")
                 extra += f'train_fn.supervision_mode = "{args.supervision_mode}"\n'
-            if MODEL_SPECS[model].scorer == "ExpertHistory":
-                extra += ABLATIONS[args.ablation]
-            elif MODEL_SPECS[model].scorer == "LCAR":
-                if args.ablation not in LCAR_ABLATIONS:
+            if MODEL_SPECS[model].scorer == "LCAR":
+                if args.ablation not in ABLATIONS:
                     raise ValueError(f"Ablation {args.ablation} does not apply to LCAR")
-                extra += LCAR_ABLATIONS[args.ablation]
+                extra += ABLATIONS[args.ablation]
             config.write_text(config.read_text() + extra)
             configs[model] = config
             smoke = model_dir / "smoke.gin"

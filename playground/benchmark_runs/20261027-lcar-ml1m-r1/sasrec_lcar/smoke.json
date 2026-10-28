@@ -1,0 +1,6 @@
+{
+  "steps": 1,
+  "loss": 4.906846046447754,
+  "finite_gradients": true,
+  "peak_memory_bytes": 4000172032
+}

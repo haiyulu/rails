@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from rails.similarities.module import SimilarityModule
-from .backbones import masked_softmax
+from .attention import masked_softmax
 from .encoding import backbone_version, encode_latent_history
 from .sparse_coding import NonnegativeSparseCoding
 from .states import ItemState,JointMemory,ModelContext,UserMemory
@@ -16,16 +16,18 @@ from .states import ItemState,JointMemory,ModelContext,UserMemory
 
 class LCARSimilarity(SimilarityModule):
     requires_user_memory=True
-    uses_appended_latents=True
     scorer_type='LCAR'
     exact_top_k_method='LearnedBruteForceTopK'
 
+    SOURCE_NAMES = ('recent', 'global', 'selected', 'summary')
+
     @torch.inference_mode(False)
-    def __init__(self,query_embedding_dim,item_embedding_dim,num_item_experts=2,
-                 dictionary_size=512,max_active_latents=16,events_per_slot=16,
+    def __init__(self,query_embedding_dim,item_embedding_dim,num_item_experts=4,
+                 dictionary_size=128,max_active_latents=16,events_per_slot=16,
                  recent_events=32,attention_dim=32,value_dim=32,memory_dim=32,
                  hidden_dim=64,sparse_coding_steps=8,sparse_l1_weight=.01,
-                 latent_chunk_size=128,eps=1e-8,use_selected_tokens=True,use_summary_tokens=True):
+                 latent_chunk_size=128,eps=1e-8,use_selected_tokens=True,use_summary_tokens=True,
+                 use_global_token=True,use_source_embeddings=True):
         super().__init__()
         if min(query_embedding_dim,item_embedding_dim,num_item_experts,events_per_slot,
                attention_dim,value_dim,memory_dim,hidden_dim,latent_chunk_size)<1 or recent_events<0:
@@ -45,6 +47,8 @@ class LCARSimilarity(SimilarityModule):
         self.eps=eps
         self.use_selected_tokens=use_selected_tokens
         self.use_summary_tokens=use_summary_tokens
+        self.use_global_token=use_global_token
+        self.use_source_embeddings=use_source_embeddings
         self.sparse_coder=NonnegativeSparseCoding(num_item_experts,dictionary_size,attention_dim,
                                                  max_active_latents,sparse_coding_steps,sparse_l1_weight,eps)
         self.token_projections=nn.ModuleList([nn.Linear(attention_dim,query_embedding_dim)
@@ -52,6 +56,8 @@ class LCARSimilarity(SimilarityModule):
         self.summary_projections=nn.ModuleList([nn.Linear(query_embedding_dim,memory_dim)
                                                 for _ in range(num_item_experts)])
         self.raw_projection=nn.Linear(query_embedding_dim,memory_dim)
+        self.global_projection=nn.Linear(query_embedding_dim,memory_dim)
+        self.source_embeddings=nn.Parameter(torch.zeros(len(self.SOURCE_NAMES),memory_dim))
         self.memory_key=nn.Linear(memory_dim,attention_dim)
         self.memory_value=nn.Linear(memory_dim,value_dim)
         self.item_experts=nn.ModuleList([nn.Sequential(nn.Linear(item_embedding_dim,hidden_dim),nn.SiLU(),
@@ -66,22 +72,24 @@ class LCARSimilarity(SimilarityModule):
         self._model_cache=None
 
     def get_extra_state(self):
-        return dict(format_version=3,scorer_type='LCAR',query_embedding_dim=self.query_embedding_dim,
+        return dict(format_version=4,scorer_type='LCAR',query_embedding_dim=self.query_embedding_dim,
                     item_embedding_dim=self.item_embedding_dim,num_item_experts=self.num_item_experts,
                     dictionary_size=self.dictionary_size,max_active_latents=self.max_active_latents,
                     events_per_slot=self.events_per_slot,recent_events=self.recent_events,
                     attention_dim=self.attention_dim,value_dim=self.value_dim,memory_dim=self.memory_dim,
                     hidden_dim=self.hidden_dim,sparse_coding_steps=self.sparse_coder.steps,
                     use_selected_tokens=self.use_selected_tokens,use_summary_tokens=self.use_summary_tokens,
+                    use_global_token=self.use_global_token,use_source_embeddings=self.use_source_embeddings,
+                    memory_sources=self.SOURCE_NAMES,
                     sparse_l1_weight=self.sparse_coder.l1_weight,latent_chunk_size=self.latent_chunk_size,
                     selection='first_block_native_coefficients_mean_heads',overlap='retain_recent_selected',
                     target_position='prefix_length',target_time='request_or_last_valid',
-                    hstu_normalization='host_reference_capacity',expert_gating='final_logits_only',
+                    native_normalization='host_reference_capacity',expert_gating='final_logits_only',
                     coefficient_use='support_and_auxiliary_only',eps=self.eps)
 
     def set_extra_state(self,state):
         if state!=self.get_extra_state():
-            raise ValueError('LCAR checkpoint architecture/settings differ; version 3 is required')
+            raise ValueError('LCAR checkpoint architecture/settings differ; version 4 is required')
         self._model_cache=None
         self.sparse_coder._step_cache=None
 
@@ -90,9 +98,10 @@ class LCARSimilarity(SimilarityModule):
             raise ValueError('Construct and move LCAR parameters outside inference_mode')
         return (id(self),self.training,tuple((id(p),p._version,p.dtype,p.device) for p in self.parameters()))
 
-    def initialize_after_encoder_construction(self):
-        self.sparse_coder.reset_parameters()
-        self._model_cache=None
+    def wrap_encoder(self, backbone, *, adapter=None):
+        """Attach LCAR without modifying or registering its parameters in the host."""
+        from .encoder import LCAREncoder
+        return LCAREncoder(backbone, self, adapter=adapter)
 
     @torch.no_grad()
     def post_optimizer_step(self):
@@ -107,7 +116,11 @@ class LCARSimilarity(SimilarityModule):
         self.sparse_coder.step_size()
         tokens=torch.stack([projection(self.sparse_coder.dictionary[e])
                             for e,projection in enumerate(self.token_projections)])
-        context=ModelContext(tokens*math.sqrt(self.query_embedding_dim),version)
+        sources = self.source_embeddings if self.use_source_embeddings else torch.zeros_like(self.source_embeddings)
+        # Source offsets use projection weights only: cached base K/V already include bias.
+        source_keys = torch.nn.functional.linear(sources, self.memory_key.weight).float()
+        source_values = torch.nn.functional.linear(sources, self.memory_value.weight).float()
+        context=ModelContext(tokens*math.sqrt(self.query_embedding_dim),source_keys,source_values,version)
         if cacheable: self._model_cache=version,context
         return context
 
@@ -134,8 +147,8 @@ class LCARSimilarity(SimilarityModule):
                          self.value_query(queries).float(),indices,mask,coefficients,alpha,
                          self.expert_gate(x).float().softmax(-1),fallback,loss,self.version())
 
-    def finish_user_memory(self,encoded,history_states=None,history_mask=None,context=None,event_payloads=None):
-        """Consume first-block indices and final latent states; no pooling pass."""
+    def finish_user_memory(self,encoded,*,event_payloads=None):
+        """Pack originals, the native history readout, and individual latent summaries."""
         if encoded.context.version!=self.version(): raise ValueError('Stale LCAR encoder output')
         raw,mask=encoded.original,encoded.mask
         batch,length,_=raw.shape
@@ -169,6 +182,16 @@ class LCARSimilarity(SimilarityModule):
                                for e,projection in enumerate(self.summary_projections)],1).float()
         summary_mask=(counts>0)[:,None,None].expand(batch,self.num_item_experts,self.dictionary_size)
         summaries=summaries*summary_mask[...,None]
+        # Use original valid positions, not a padded final slot or the latent suffix.
+        last_position = positions.masked_fill(~mask, -1).amax(-1).clamp_min(0)
+        if encoded.history_states.shape[1]:
+            last_history = encoded.history_states[torch.arange(batch, device=raw.device), last_position]
+        else:
+            last_history = raw.new_zeros(batch, self.query_embedding_dim)
+        last_history = last_history * (counts > 0).unsqueeze(-1)
+        global_mask = (counts > 0).unsqueeze(-1) & self.use_global_token
+        global_token = self.global_projection(last_history.to(self.global_projection.weight.dtype))[:,None].float()
+        global_token = global_token * global_mask.unsqueeze(-1)
         payloads={}
         for name,tensor in dict(event_payloads or {}).items():
             if isinstance(tensor,torch.Tensor) and tensor.ndim>=2 and tensor.shape[:2]==mask.shape:
@@ -180,10 +203,17 @@ class LCARSimilarity(SimilarityModule):
                     self.memory_value(t.to(self.memory_value.weight.dtype)).float())
         keys,values=kv(tokens)
         summary_keys,summary_values=kv(summaries)
-        return UserMemory(tokens,keys,values,order.masked_fill(~packed_mask,-1),packed_mask,counts,
-                          reverse.gather(1,recent),recent_mask,
-                          reverse.gather(1,slots.reshape(batch,-1)).reshape_as(slots),slot_mask,
-                          summaries,summary_keys,summary_values,summary_mask,payloads,self.version())
+        global_keys,global_values=kv(global_token)
+        return UserMemory(
+            tokens=tokens,keys=keys,values=values,positions=order.masked_fill(~packed_mask,-1),
+            retained_mask=packed_mask,lengths=counts,recent_indices=reverse.gather(1,recent),
+            recent_mask=recent_mask,
+            selected_indices=reverse.gather(1,slots.reshape(batch,-1)).reshape_as(slots),
+            selected_mask=slot_mask,summaries=summaries,summary_keys=summary_keys,
+            summary_values=summary_values,summary_mask=summary_mask,
+            last_history_state=last_history,global_token=global_token,global_keys=global_keys,
+            global_values=global_values,global_mask=global_mask,event_payloads=payloads,
+            context=encoded.context,version=self.version())
 
     def _check_prepared(self,memory,items):
         if memory.encoder_ref is not None:
@@ -209,7 +239,7 @@ class LCARSimilarity(SimilarityModule):
         union=selections.masked_fill(~valid,sentinel).flatten(-3).sort(-1).values
         unique=torch.cat([torch.ones_like(union[...,:1],dtype=torch.bool),union[...,1:]!=union[...,:-1]],-1)
         union_mask=(union<sentinel)&unique&self.use_selected_tokens
-        union_size=int(union_mask.sum(-1).max().item())
+        union_size=int(union_mask.sum(-1).max().item()) if batch and n else 0
         # Compact duplicates before materializing candidate memory K/V.
         compact=(~union_mask).long().argsort(dim=-1,stable=True)[...,:union_size]
         union=union.gather(-1,compact).clamp_max(sentinel-1)
@@ -218,12 +248,26 @@ class LCARSimilarity(SimilarityModule):
         recent=memory.recent_indices[:,None].expand(batch,n,-1)
         recent_mask=memory.recent_mask[:,None].expand_as(recent)
         summary_mask=memory.summary_mask[rows,experts,active]&active_mask&self.use_summary_tokens
-        def gather(raw,summary):
-            return torch.cat([raw[row,recent],raw[row,union],summary[rows,experts,active].flatten(-3,-2)],-2)
-        keys=gather(memory.keys,memory.summary_keys)
-        values=gather(memory.values,memory.summary_values)
-        mask=torch.cat([recent_mask,union_mask,summary_mask.flatten(-2)],-1)
-        return JointMemory(keys,values,mask,memory.positions[row,union],union_mask)
+        global_mask = memory.global_mask[:,None].expand(batch,n,-1)
+        sizes = (recent.shape[-1], 1, union.shape[-1], active.shape[-2]*active.shape[-1])
+        source_ids = torch.cat([torch.full((size,),source,device=active.device,dtype=torch.long)
+                                for source,size in enumerate(sizes)])
+
+        def gather(raw,global_values,summary,offsets):
+            base = torch.cat([
+                raw[row,recent],global_values[:,None].expand(batch,n,-1,-1),
+                raw[row,union],summary[rows,experts,active].flatten(-3,-2)],-2)
+            return base + offsets[source_ids]
+
+        keys=gather(memory.keys,memory.global_keys,memory.summary_keys,memory.context.source_keys)
+        values=gather(memory.values,memory.global_values,memory.summary_values,memory.context.source_values)
+        mask=torch.cat([recent_mask,global_mask,union_mask,summary_mask.flatten(-2)],-1)
+        return JointMemory(keys,values,mask,memory.positions[row,union],union_mask,source_ids)
+
+    def attention_source_mass(self, weights, joint_memory):
+        """Detached diagnostics from an existing read, without another attention pass."""
+        return {name: weights.detach()[...,joint_memory.source_ids == source].sum(-1).mean()
+                for source,name in enumerate(self.SOURCE_NAMES)}
 
     def attend_prepared(self,memory,items,return_weights=False):
         self._check_prepared(memory,items)

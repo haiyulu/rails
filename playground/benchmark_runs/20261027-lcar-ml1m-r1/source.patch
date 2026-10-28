@@ -1,0 +1,83 @@
+diff --git a/playground/run_ml1m_benchmark.py b/playground/run_ml1m_benchmark.py
+index f65fe83..484fdd1 100644
+--- a/playground/run_ml1m_benchmark.py
++++ b/playground/run_ml1m_benchmark.py
+@@ -10,6 +10,7 @@ import hashlib
+ import json
+ import os
+ from pathlib import Path
++import shutil
+ import subprocess
+ import sys
+ import time
+@@ -123,6 +124,35 @@ def report(run):
+         lines.append(f"| {LABELS[row['model']]} | {row['selection']} | {row['ndcg@10']:.4f} | {row['ndcg@50']:.4f} |")
+     lines += ["", "All paper targets and per-metric differences are included in comparison.csv.",
+               "Reference: https://arxiv.org/html/2407.15462v3#S4.T3", ""]
++    lcar_rows = [row for row in rows if MODEL_SPECS[row["model"]].scorer == "LCAR"]
++    if lcar_rows:
++        lines += ["## LCAR comparison against paper Table 3", "",
++                  "Paper rows use the published protocol; LCAR uses sampled-prefix supervision.",
++                  "Each LCAR epoch presents one target per user, unlike all-position baseline training.",
++                  "These are single-seed experiments; best_eval_hr10 selects on the evaluation set.", "",
++                  "| Model | Selection | HR@1 | HR@10 | HR@50 | HR@200 | MRR |",
++                  "|---|---|---:|---:|---:|---:|---:|"]
++        for name, values in TARGETS.items():
++            lines.append("| " + " | ".join([LABELS[name], "paper"] + [f"{v:.4f}" for v in values]) + " |")
++        for row in lcar_rows:
++            lines.append("| " + " | ".join([LABELS[row["model"]], row["selection"]] +
++                         [f"{row[m]:.4f}" for m in METRICS]) + " |")
++        differences = []
++        lines += ["", "Differences below are LCAR minus the corresponding paper baseline, in percentage points.", "",
++                  "| LCAR model | Selection | Paper baseline | ΔHR@1 | ΔHR@10 | ΔHR@50 | ΔHR@200 | ΔMRR |",
++                  "|---|---|---|---:|---:|---:|---:|---:|"]
++        for row in lcar_rows:
++            backbone = row["model"].removesuffix("_lcar")
++            for reference in (backbone, backbone + "_mol"):
++                deltas = {m: row[m] - value for m, value in zip(METRICS, TARGETS[reference])}
++                differences.append({"model": row["model"], "selection": row["selection"],
++                                    "paper_baseline": reference, **deltas})
++                lines.append("| " + " | ".join([LABELS[row["model"]], row["selection"], LABELS[reference]] +
++                             [f"{100*deltas[m]:+.2f}" for m in METRICS]) + " |")
++        with (run / "lcar_vs_paper.csv").open("w") as f:
++            writer = csv.DictWriter(f, fieldnames=list(differences[0]))
++            writer.writeheader()
++            writer.writerows(differences)
+     (run / "comparison.md").write_text("\n".join(lines))
+ 
+ 
+@@ -157,6 +187,21 @@ def main():
+     (run / "requirements.lock.txt").write_text(subprocess.check_output(
+         ["uv", "pip", "freeze", "--python", sys.executable], text=True))
+     (run / "source.patch").write_text(subprocess.check_output(["git", "diff"], cwd=ROOT, text=True))
++    # Include new modules/configs, which an ordinary git diff does not capture.
++    sources = subprocess.check_output(
++        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode().split("\0")
++    source_hashes = {}
++    for relative in sources:
++        source = ROOT / relative
++        if not relative or source.suffix not in (".py", ".gin", ".md", ".toml") or not source.is_file():
++            continue
++        if relative.startswith("playground/benchmark_runs/") or relative.startswith("playground/inference_flops_runs/"):
++            continue
++        target = run / "source" / relative
++        target.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy2(source, target)
++        source_hashes[relative] = hashlib.sha256(source.read_bytes()).hexdigest()
++    dump(run / "source_sha256.json", source_hashes)
+     try:
+         command([sys.executable, "playground/validate_ml1m_benchmark.py"], run / "logs/validation.log", env, manifest)
+         configs = {}
+diff --git a/playground/validate_ml1m_benchmark.py b/playground/validate_ml1m_benchmark.py
+index 7a23a89..fc7792b 100644
+--- a/playground/validate_ml1m_benchmark.py
++++ b/playground/validate_ml1m_benchmark.py
+@@ -48,6 +48,8 @@ def jagged_check():
+ 
+ def metrics_check():
+     class Model:
++        _ndp_module = SimpleNamespace(requires_user_memory=False)
++
+         def get_item_embeddings(self, ids):
+             return ids.float().unsqueeze(-1)
+ 

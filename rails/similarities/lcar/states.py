@@ -17,10 +17,12 @@ def tensor_bytes(tensors):
 @dataclass(frozen=True)
 class ModelContext:
     initial_tokens: torch.Tensor
+    source_keys: torch.Tensor
+    source_values: torch.Tensor
     version: Tuple
 
     def num_bytes(self):
-        return tensor_bytes([self.initial_tokens])
+        return tensor_bytes([self.initial_tokens, self.source_keys, self.source_values])
 
 
 @dataclass(frozen=True)
@@ -62,7 +64,13 @@ class UserMemory:
     summary_keys: torch.Tensor
     summary_values: torch.Tensor
     summary_mask: torch.Tensor
+    last_history_state: torch.Tensor
+    global_token: torch.Tensor
+    global_keys: torch.Tensor
+    global_values: torch.Tensor
+    global_mask: torch.Tensor
     event_payloads: Dict[str, torch.Tensor]
+    context: ModelContext
     version: Tuple
     encoder_ref: Optional[object] = None
     encoder_version: Optional[Tuple] = None
@@ -142,3 +150,4 @@ class JointMemory:
     mask: torch.Tensor
     selected_positions: torch.Tensor
     selected_mask: torch.Tensor
+    source_ids: torch.Tensor

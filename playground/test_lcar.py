@@ -9,13 +9,14 @@ from torch import nn
 from torch.nn import functional as F
 
 from rails.similarities.lcar import LCARSimilarity, register_backbone_adapter
-from rails.similarities.lcar.backbones import get_backbone_adapter
+from rails.similarities.lcar.sparse_coding import NonnegativeSparseCoding
+from rails.similarities.lcar.adapters import get_backbone_adapter
 from rails.indexing.learned_top_k import LearnedBruteForceTopK
-from playground.test_expert_history import small_backbone, configured_backbone, ROOT
+from playground.test_retrieval_integration import small_backbone, configured_backbone, ROOT
 
 
 def lcar(**kwargs):
-    options=dict(query_embedding_dim=6,item_embedding_dim=6,dictionary_size=5,
+    options=dict(query_embedding_dim=6,item_embedding_dim=6,num_item_experts=2,dictionary_size=5,
                  max_active_latents=2,events_per_slot=2,recent_events=3,
                  attention_dim=3,value_dim=3,memory_dim=3,hidden_dim=12,latent_chunk_size=3)
     options.update(kwargs)
@@ -31,11 +32,12 @@ def fixture(device='cpu'):
 
 def encode(model,inputs,**kwargs):
     lengths,ids,payloads=inputs
-    return model._ndp_module.encode_history(model,lengths,ids,model.get_item_embeddings(ids),payloads,**kwargs)
+    return model.encode_history(lengths,ids,model.get_item_embeddings(ids),payloads,**kwargs)
 
 
 def native_single_target(model,encoded,row,index,inputs):
     """Independent native block execution with just ONE appended candidate."""
+    model=model.backbone
     lengths,ids,payloads=inputs
     length=int(lengths[row])
     target=(encoded.context.initial_tokens.flatten(0,1)[index]
@@ -83,6 +85,29 @@ class LCARTests(unittest.TestCase):
 
     def model(self,backbone='SASRec',device='cpu',**kwargs):
         return small_backbone(backbone,device,interaction=lcar(**kwargs)).eval()
+
+    def test_dictionary_constraints_support_and_zero_fallback(self):
+        coding=NonnegativeSparseCoding(2,5,3,2,l1_weight=100)
+        _,mask,coefficients,weights,fallback,loss=coding(torch.randn(2,4,2,3))
+        self.assertTrue(fallback.all())
+        self.assertTrue((coefficients==0).all())
+        self.assertTrue((mask.sum(-1)==1).all())
+        torch.testing.assert_close(weights.sum(-1),torch.ones_like(weights.sum(-1)))
+        with torch.no_grad():
+            coding.dictionary.mul_(10)
+        coding.project_dictionary_()
+        self.assertTrue((coding.dictionary.norm(dim=-1)<=1.000001).all())
+        self.assertTrue(torch.isfinite(loss).all())
+
+    def test_sparse_solver_reduces_objective_and_has_gradients(self):
+        coding=NonnegativeSparseCoding(1,7,4,7,steps=16)
+        query=torch.randn(2,3,1,4,requires_grad=True)
+        _,_,coefficients,_,_,loss=coding(query)
+        self.assertTrue((coefficients>=0).all())
+        self.assertLess(loss.mean().item(),.5)
+        loss.mean().backward()
+        self.assertGreater(query.grad.abs().sum().item(),0)
+        self.assertGreater(coding.dictionary.grad.abs().sum().item(),0)
 
     def test_native_sasrec_independent_target_equivalence_and_selection(self):
         import gin
@@ -144,8 +169,8 @@ class LCARTests(unittest.TestCase):
             module=model._ndp_module
             self.assertGreater(module.sparse_coder.dictionary.grad.abs().sum().item(),0)
             self.assertTrue(all(p.weight.grad is not None for p in module.token_projections))
-            first=(model.attention_layers[0].in_proj_weight if name=='SASRec'
-                   else model._hstu._attention_layers[0]._uvqk)
+            first=(model.backbone.attention_layers[0].in_proj_weight if name=='SASRec'
+                   else model.backbone._hstu._attention_layers[0]._uvqk)
             self.assertGreater(first.grad.abs().sum().item(),0)
             self.assertIsNone(module.raw_projection.weight.grad)
 
@@ -169,8 +194,9 @@ class LCARTests(unittest.TestCase):
     def test_joint_attention_matches_direct_unpooled_reference(self):
         with torch.inference_mode():
             for candidate_batch in (1,2):
-                model=self.model()
+                model=self.model(num_item_experts=4)
                 module=model._ndp_module
+                module.source_embeddings.normal_()
                 inputs=fixture()
                 encoded=encode(model,inputs)
                 memory=module.finish_user_memory(encoded)
@@ -183,7 +209,7 @@ class LCARTests(unittest.TestCase):
                         recent=list(range(max(0,length-3),length))
                         union=set()
                         summary=[]
-                        for expert in range(2):
+                        for expert in range(module.num_item_experts):
                             for k,atom in enumerate(items.active_indices[item_row,candidate,expert]):
                                 if items.active_mask[item_row,candidate,expert,k]:
                                     slot=expert*5+int(atom)
@@ -191,20 +217,24 @@ class LCARTests(unittest.TestCase):
                                     summary.append(module.summary_projections[expert](encoded.latent_states[row,slot]))
                         positions=recent+sorted(union) # Preserve recent/selected multiplicity.
                         original=module.raw_projection(encoded.original[row,positions])
-                        tokens=torch.cat([original,torch.stack(summary)],0)
+                        global_token=module.global_projection(encoded.history_states[row,length-1])[None]
+                        tokens=torch.cat([original[:len(recent)]+module.source_embeddings[0],
+                                          global_token+module.source_embeddings[1],
+                                          original[len(recent):]+module.source_embeddings[2],
+                                          torch.stack(summary)+module.source_embeddings[3]],0)
                         keys,values=module.memory_key(tokens),module.memory_value(tokens)
                         query=module.query_projection(items.queries[item_row,candidate])
                         probability=(query@keys.T/module.attention_dim**.5).softmax(-1)
                         expected=probability@values
                         torch.testing.assert_close(actual[row,candidate],expected,atol=2e-6,rtol=2e-5)
-                        self.assertEqual(int(joint.mask[row,candidate].sum()),len(positions)+len(summary))
+                        self.assertEqual(int(joint.mask[row,candidate].sum()),len(positions)+1+len(summary))
                 torch.testing.assert_close(weights.sum(-1),torch.ones_like(weights.sum(-1)))
 
     def test_pi_only_mixes_final_scores_and_alpha_is_diagnostic(self):
         model=self.model()
         module=model._ndp_module
         inputs=fixture()
-        memory=module.prepare_user(model,*inputs[:2],model.get_item_embeddings(inputs[1]),inputs[2])
+        memory=module.prepare_user(model.backbone,*inputs[:2],model.get_item_embeddings(inputs[1]),inputs[2])
         items=module.prepare_items(torch.randn(1,2,6))
         outputs,weights,_=module.attend_prepared(memory,items,True)
         logits=module.expert_logits(outputs,items)
@@ -215,6 +245,123 @@ class LCARTests(unittest.TestCase):
         torch.testing.assert_close(weights,other_weights)
         scores=module.score_prepared(memory,different)[0]
         torch.testing.assert_close(scores,(logits*different.expert_weights).sum(-1))
+
+    def test_global_readout_matches_native_history_and_has_its_own_gradients(self):
+        for name in ('SASRec','HSTU'):
+            model=self.model(name)
+            lengths,ids,payloads=fixture()
+            # Match the candidate-time policy of the native HSTU reference.
+            payloads={key:value.clone() for key,value in payloads.items()}
+            payloads['timestamps'].scatter_(1,lengths[:,None],payloads['request_timestamps'][:,None])
+            native=model.backbone(lengths,ids,model.get_item_embeddings(ids),payloads)
+            _,memory=model.encode_with_history(lengths,ids,model.get_item_embeddings(ids),payloads)
+            expected=native[torch.arange(2),lengths-1]
+            torch.testing.assert_close(memory.last_history_state,expected,atol=3e-5,rtol=3e-5)
+            torch.testing.assert_close(memory.global_token[:,0],model._ndp_module.global_projection(expected),atol=3e-5,rtol=3e-5)
+            (memory.global_token*torch.randn_like(memory.global_token)).sum().backward()
+            self.assertGreater(model._ndp_module.global_projection.weight.grad.abs().sum().item(),0)
+            self.assertIsNone(model._ndp_module.sparse_coder.dictionary.grad)
+            self.assertTrue(any(p.grad is not None and p.grad.abs().sum()>0 for p in model.backbone.parameters()))
+
+    def test_four_sources_masking_offsets_gradients_and_attention_mass(self):
+        model=self.model()
+        module=model._ndp_module
+        with torch.no_grad():
+            module.source_embeddings.normal_()
+            module.memory_key.bias.fill_(.7)
+            module.memory_value.bias.fill_(.3)
+            module.global_projection.bias.fill_(2.)
+        inputs=fixture()
+        _,memory=model.encode_with_history(inputs[0],inputs[1],model.get_item_embeddings(inputs[1]),inputs[2])
+        items=module.prepare_items(torch.randn(1,3,6))
+        outputs,weights,joint=module.attend_prepared(memory,items,True)
+        masses=module.attention_source_mass(weights,joint)
+        torch.testing.assert_close(sum(masses.values()),torch.tensor(1.))
+        self.assertEqual(tuple(masses),module.SOURCE_NAMES)
+        self.assertTrue(all(not value.requires_grad for value in masses.values()))
+        self.assertTrue(torch.equal(joint.source_ids,joint.source_ids.sort().values))
+        self.assertEqual(int((joint.source_ids==1).sum()),1)
+        # Offsets are linear: the base token's affine bias appears only once.
+        for source in range(4):
+            token=torch.randn(3,module.memory_dim)
+            torch.testing.assert_close(module.memory_key(token+module.source_embeddings[source]),
+                module.memory_key(token)+memory.context.source_keys[source])
+            torch.testing.assert_close(module.memory_value(token+module.source_embeddings[source]),
+                module.memory_value(token)+memory.context.source_values[source])
+        outputs.square().sum().backward()
+        self.assertTrue((module.source_embeddings.grad.abs().sum(-1)>0).all())
+        self.assertIs(memory.index_batch(0).context,memory.context)
+        with torch.inference_mode():
+            empty=torch.zeros(1,11,dtype=torch.long)
+            _,empty_memory=model.encode_with_history(torch.tensor([0]),empty,model.get_item_embeddings(empty),{})
+            self.assertEqual(empty_memory.last_history_state.abs().sum().item(),0)
+            self.assertEqual(empty_memory.global_token.abs().sum().item(),0)
+            _,probability,empty_joint=module.attend_prepared(empty_memory,module.prepare_items(torch.randn(1,2,6)),True)
+            self.assertFalse(empty_joint.mask.any())
+            self.assertEqual(sum(module.attention_source_mass(probability,empty_joint).values()).item(),0)
+
+    def test_wrapper_owns_parameters_once_and_default_budget_is_512(self):
+        from rails.similarities.lcar import LCAREncoder
+        model=self.model()
+        self.assertIsInstance(model,LCAREncoder)
+        self.assertFalse(any('LCAR' in type(layer).__name__ for layer in model.backbone.modules()))
+        named=list(model.named_parameters(remove_duplicate=False))
+        self.assertEqual(len(named),len({id(parameter) for _,parameter in named}))
+        self.assertTrue(all(name.startswith(('backbone.','_ndp_module.')) for name,_ in named))
+        with self.assertRaisesRegex(ValueError,'already attached'):
+            model._ndp_module.wrap_encoder(model)
+        module=LCARSimilarity(50,50)
+        self.assertEqual(module.sparse_coder.dictionary.shape,(4,128,32))
+        self.assertEqual(module.prepare_model().initial_tokens.numel(),512*50)
+        self.assertEqual(module.get_extra_state()['format_version'],4)
+
+    def test_global_and_source_ablations_are_explicit(self):
+        model=self.model(use_global_token=False,use_source_embeddings=False)
+        inputs=fixture()
+        _,memory=model.encode_with_history(inputs[0],inputs[1],model.get_item_embeddings(inputs[1]),inputs[2])
+        self.assertFalse(memory.global_mask.any())
+        self.assertEqual(memory.context.source_keys.abs().sum().item(),0)
+        self.assertEqual(memory.context.source_values.abs().sum().item(),0)
+
+    def test_zero_width_prefix_and_zero_candidate_shapes(self):
+        for name in ('SASRec','HSTU'):
+            model=self.model(name)
+            with torch.inference_mode():
+                ids=torch.empty(2,0,dtype=torch.long)
+                _,memory=model.encode_with_history(torch.zeros(2,dtype=torch.long),ids,
+                    model.get_item_embeddings(ids),{'timestamps':ids})
+                self.assertFalse(memory.global_mask.any())
+                module=model._ndp_module
+                items=module.prepare_items(torch.randn(1,2,6))
+                outputs,weights,_=module.attend_prepared(memory,items,True)
+                self.assertEqual(outputs.abs().sum().item(),0)
+                self.assertEqual(weights.abs().sum().item(),0)
+                empty_items=module.prepare_items(torch.empty(1,0,6))
+                self.assertEqual(module.score_prepared(memory,empty_items)[0].shape,(2,0))
+
+    def test_global_source_and_catalog_changes_reject_prepared_states(self):
+        from indexing.utils_rails import get_top_k_module
+        model=self.model()
+        module=model._ndp_module
+        inputs=fixture()
+        with torch.inference_mode():
+            def prepare():
+                return model.encode_with_history(inputs[0],inputs[1],model.get_item_embeddings(inputs[1]),inputs[2])
+            embeddings=model.get_item_embeddings(torch.arange(1,4))[None]
+            ids=torch.arange(1,4)[None]
+            for parameter in (module.global_projection.weight,module.source_embeddings):
+                _,memory=prepare()
+                items=module.prepare_items(embeddings,ids)
+                parameter.add_(.1)
+                with self.assertRaisesRegex(ValueError,'Stale'):
+                    module.score_prepared(memory,items)
+                _,fresh=prepare()
+                torch.testing.assert_close(memory.last_history_state,fresh.last_history_state,rtol=0,atol=0)
+            current,memory=prepare()
+            top=get_top_k_module('LearnedBruteForceTopK',model,embeddings,ids,candidate_chunk_size=2)
+            model._embedding_module._item_emb.weight.add_(.1)
+            with self.assertRaisesRegex(ValueError,'Stale catalog embedding'):
+                top(current,2,user_memory=memory)
 
     def test_empty_short_histories_and_memory_segment_ablations(self):
         for name in ('SASRec','HSTU'):
@@ -239,7 +386,7 @@ class LCARTests(unittest.TestCase):
                 model=self.model(name)
                 inputs=fixture()
                 first=encode(model,inputs)
-                self.assertEqual(len(first.history_cache.layers),model._num_blocks)
+                self.assertEqual(len(first.history_cache.layers),model.backbone._num_blocks)
                 model._ndp_module.sparse_coder.dictionary.add_(.05)
                 second=encode(model,inputs,history_cache=first.history_cache)
                 fresh=encode(model,inputs)
@@ -289,7 +436,7 @@ class LCARTests(unittest.TestCase):
                 h,memory=model.encode_with_history(inputs[0],inputs[1],model.get_item_embeddings(inputs[1]),inputs[2])
                 torch.testing.assert_close(module.score_prepared(memory,module.prepare_items(embeddings,ids))[0],score)
                 bad=module.get_extra_state(); bad['format_version']=2
-                with self.assertRaisesRegex(ValueError,'version 3'):
+                with self.assertRaisesRegex(ValueError,'version 4'):
                     module.set_extra_state(bad)
 
     def test_chunking_preserves_recommendation_and_sparse_gradients(self):
@@ -367,14 +514,14 @@ class LCARTests(unittest.TestCase):
             gin.parse_config_file(str(ROOT/f'configs/ml-1m/{name}-lcar.gin'))
             scorer,description=get_similarity_function('LCAR',50,50)
             self.assertEqual(scorer.scorer_type,'LCAR')
-            self.assertEqual((scorer.dictionary_size,scorer.max_active_latents,scorer.recent_events),(512,16,32))
+            self.assertEqual((scorer.dictionary_size,scorer.max_active_latents,scorer.recent_events),(128,16,32))
             self.assertEqual(scorer.expert_scorers[0][0].in_features,96)
-            self.assertIn('LCAR-v3',description)
+            self.assertIn('LCAR-v4',description)
             self.assertEqual(MODEL_SPECS[name+'_lcar'].scorer,'LCAR')
-            self.assertEqual(gin.query_parameter('train_fn.supervision_mode'),'sampled_prefix')
+            self.assertEqual(gin.query_parameter('train_fn.supervision_mode'),'full_prefix')
         gin.clear_config()
 
-    def test_checkpointing_and_sampled_prefix_ddp(self):
+    def test_checkpointing_and_prefix_ddp(self):
         import tempfile
         import torch.distributed as dist
         from torch.nn.parallel import DistributedDataParallel
@@ -393,7 +540,7 @@ class LCARTests(unittest.TestCase):
                     for _ in range(2):
                         optimizer.zero_grad(set_to_none=True)
                         loss,aux=ddp(inputs[0],inputs[1],model.get_item_embeddings(inputs[1]),inputs[2],
-                                     sampled_targets=torch.tensor([9,10]),negatives_sampler=sampler,sampled_loss=loss_fn)
+                                     prefix_targets=torch.tensor([9,10]),negatives_sampler=sampler,sampled_loss=loss_fn)
                         total=loss+.1*aux['sparse_code_loss']
                         total.backward()
                         self.assertTrue(torch.isfinite(total))
@@ -411,7 +558,7 @@ class LCARTests(unittest.TestCase):
         from data.eval import get_eval_state,eval_metrics_v2_from_tensors
         from indexing.utils_rails import get_top_k_module
         from modeling.sequential.features import movielens_seq_features_from_row
-        from modeling.sequential.prefix_sampling import sample_causal_prefix
+        from modeling.sequential.prefix_sampling import full_causal_prefix
         from modeling.sequential.autoregressive_losses import LocalNegativesSampler
         from modeling.sequential.losses.sampled_softmax import SampledSoftmaxLoss
         from torch.utils.data._utils.collate import default_collate
@@ -422,14 +569,14 @@ class LCARTests(unittest.TestCase):
             features,targets,_=movielens_seq_features_from_row(row,'cuda',11)
             for name in ('sasrec','hstu'):
                 model=configured_backbone(ROOT/f'configs/ml-1m/{name}-lcar.gin',dataset.max_item_id,'cuda')
-                prefix,next_ids=sample_causal_prefix(features,targets,torch.Generator(device='cuda').manual_seed(7))
+                prefix,next_ids=full_causal_prefix(features,targets)
                 sampler=LocalNegativesSampler(dataset.max_item_id,model._embedding_module._item_emb,
                                                dataset.all_item_ids,True,1e-6).cuda()
                 criterion=SampledSoftmaxLoss(3,1.,model,activation_checkpoint=True,candidate_chunk_size=2)
                 model.train()
                 optimizer=torch.optim.AdamW(model.parameters(),lr=1e-3)
                 loss,aux=model(prefix.past_lengths,prefix.past_ids,model.get_item_embeddings(prefix.past_ids),
-                               prefix.past_payloads,sampled_targets=next_ids,negatives_sampler=sampler,sampled_loss=criterion)
+                               prefix.past_payloads,prefix_targets=next_ids,negatives_sampler=sampler,sampled_loss=criterion)
                 total=loss+.1*aux['sparse_code_loss']; total.backward()
                 self.assertTrue(torch.isfinite(total))
                 self.assertTrue(all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None))
@@ -437,7 +584,7 @@ class LCARTests(unittest.TestCase):
                 with torch.inference_mode():
                     _,memory=model.encode_with_history(prefix.past_lengths,prefix.past_ids,
                                                         model.get_item_embeddings(prefix.past_ids),prefix.past_payloads)
-                    self.assertEqual(memory.summaries.shape[1:],(2,512,32))
+                    self.assertEqual(memory.summaries.shape[1:],(4,128,32))
                     checkpoint=io.BytesIO(); torch.save(model.state_dict(),checkpoint); checkpoint.seek(0)
                     model.load_state_dict(torch.load(checkpoint,weights_only=True),strict=True)
                     state=get_eval_state(model,dataset.all_item_ids[:12],sampler,

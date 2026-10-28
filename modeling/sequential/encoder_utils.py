@@ -25,6 +25,7 @@ from modeling.sequential.input_features_preprocessors import (
 )
 from modeling.sequential.output_postprocessors import OutputPostprocessorModule
 from modeling.sequential.sasrec import SASRec
+from rails.similarities.dot_product_similarity_fn import DotProductSimilarity
 from modeling.similarity_module import SequentialEncoderWithLearnedSimilarityModule
 
 from rails.similarities.module import SimilarityModule
@@ -120,13 +121,16 @@ def get_sequential_encoder(
     output_postproc_module: OutputPostprocessorModule,
     verbose: bool,
     activation_checkpoint: bool = False,
-) -> SequentialEncoderWithLearnedSimilarityModule:
+) -> torch.nn.Module:
+    """Build a native encoder and attach an optional scorer-owned wrapper."""
+    wrap_encoder = getattr(interaction_module, "wrap_encoder", None)
+    native_similarity = DotProductSimilarity() if wrap_encoder is not None else interaction_module
     if module_type == "SASRec":
         model = sasrec_encoder(
             max_sequence_length=max_sequence_length,
             max_output_length=max_output_length,
             embedding_module=embedding_module,
-            interaction_module=interaction_module,
+            interaction_module=native_similarity,
             input_preproc_module=input_preproc_module,
             output_postproc_module=output_postproc_module,
             activation_checkpoint=activation_checkpoint,
@@ -137,7 +141,7 @@ def get_sequential_encoder(
             max_sequence_length=max_sequence_length,
             max_output_length=max_output_length,
             embedding_module=embedding_module,
-            interaction_module=interaction_module,
+            interaction_module=native_similarity,
             input_preproc_module=input_preproc_module,
             output_postproc_module=output_postproc_module,
             activation_checkpoint=activation_checkpoint,
@@ -145,9 +149,7 @@ def get_sequential_encoder(
         )
     else:
         raise ValueError(f"Unsupported module_type {module_type}")
-    initialize = getattr(interaction_module, "initialize_after_encoder_construction", None)
-    if getattr(interaction_module,'uses_appended_latents',False):
-        model._activation_checkpoint=activation_checkpoint
-    if initialize is not None:
-        initialize()
+    if wrap_encoder is not None:
+        model._activation_checkpoint = activation_checkpoint
+        return wrap_encoder(model)
     return model

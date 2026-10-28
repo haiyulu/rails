@@ -3,7 +3,7 @@
 import torch
 from torch.utils.checkpoint import checkpoint
 
-from .backbones import get_backbone_adapter
+from .adapters import get_backbone_adapter
 from .states import EncoderOutput, HistoryCache
 
 
@@ -26,6 +26,18 @@ def encode_latent_history(module,backbone,lengths,ids,embeddings,payloads,
     the host as a child or copies its block parameters.
     """
     adapter=get_backbone_adapter(backbone) if adapter is None else adapter
+    if adapter.num_layers < 1:
+        raise ValueError('LCAR requires at least one block for selection and summarization')
+    if ids.shape[1] == 0:
+        # Native pointwise/Conv1d blocks need a physical slot even for an empty prefix.
+        if bool((lengths != 0).any()):
+            raise ValueError('Nonempty lengths require history input slots')
+        batch = ids.shape[0]
+        ids = ids.new_zeros(batch, 1)
+        embeddings = embeddings.new_zeros(batch, 1, embeddings.shape[-1])
+        payloads = {name: value.new_zeros(batch, 1, *value.shape[2:])
+                    if value.ndim >= 2 and value.shape[:2] == (batch, 0) else value
+                    for name, value in payloads.items()}
     original,mask=adapter.preprocess(lengths,ids,embeddings,payloads)
     context=module.prepare_model()
     bases=context.initial_tokens.flatten(0,1)

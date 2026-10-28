@@ -2,16 +2,19 @@ include 'configs/ml-1m/hstu-sampled-softmax-n128-rails-final.gin'
 
 train_fn.interaction_module_type = "LCAR"
 train_fn.top_k_method = "LearnedBruteForceTopK"
-train_fn.supervision_mode = "sampled_prefix"
+train_fn.supervision_mode = "full_prefix"
 train_fn.temperature = 1.0
 train_fn.loss_weights = {"sparse_code_loss": 0.1}
 train_fn.custom_date_str = "lcar"
 
-create_lcar_interaction_module.num_item_experts = 2
-create_lcar_interaction_module.dictionary_size = 512
+create_lcar_interaction_module.num_item_experts = 4
+create_lcar_interaction_module.dictionary_size = 128
 create_lcar_interaction_module.max_active_latents = 16
 create_lcar_interaction_module.events_per_slot = 16
 create_lcar_interaction_module.recent_events = 32
 create_lcar_interaction_module.sparse_coding_steps = 8
 create_lcar_interaction_module.sparse_l1_weight = 0.01
 create_lcar_interaction_module.latent_chunk_size = 128
+
+create_lcar_interaction_module.use_global_token = True
+create_lcar_interaction_module.use_source_embeddings = True

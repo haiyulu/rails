@@ -22,6 +22,7 @@ Main entry point for model training. Please refer to README.md for usage instruc
 import logging
 import json
 import os
+from pathlib import Path
 import random
 
 from datetime import date
@@ -57,7 +58,7 @@ from modeling.sequential.losses.sampled_softmax import SampledSoftmaxLoss
 from modeling.sequential.embedding_modules import EmbeddingModule, LocalEmbeddingModule
 from modeling.sequential.encoder_utils import get_sequential_encoder
 from modeling.sequential.features import movielens_seq_features_from_row
-from modeling.sequential.prefix_sampling import sample_causal_prefix
+from modeling.sequential.prefix_sampling import full_causal_prefix, sample_causal_prefix
 from modeling.sequential.input_features_preprocessors import (
     LearnablePositionalEmbeddingInputFeaturesPreprocessor,
 )
@@ -152,12 +153,12 @@ def train_fn(
     smoke_steps: int = 0,
     supervision_mode: str = "all_positions",
 ) -> None:
-    if supervision_mode not in ("all_positions", "sampled_prefix"):
+    if supervision_mode not in ("all_positions", "sampled_prefix", "full_prefix"):
         raise ValueError(f"Unknown supervision_mode {supervision_mode}")
-    if interaction_module_type in ("ExpertHistory","LCAR") and supervision_mode != "sampled_prefix":
-        raise ValueError(f"{interaction_module_type} training requires sampled_prefix supervision")
-    if supervision_mode == "sampled_prefix" and loss_module != "SampledSoftmaxLoss":
-        raise ValueError("sampled_prefix requires SampledSoftmaxLoss")
+    if interaction_module_type == "LCAR" and supervision_mode == "all_positions":
+        raise ValueError("LCAR requires one causal prefix per training target")
+    if supervision_mode != "all_positions" and loss_module != "SampledSoftmaxLoss":
+        raise ValueError("Prefix supervision requires SampledSoftmaxLoss")
     # to enable more deterministic results.
     if benchmark_output_dir and world_size != 1:
         raise ValueError("Benchmark checkpoint/metric recording requires a single GPU")
@@ -305,7 +306,7 @@ def train_fn(
                               "operative_config":gin.operative_config_str()}
                              if interaction_module_type=="LCAR" else {})
     model = DDP(model, device_ids=[rank], broadcast_buffers=False,
-                find_unused_parameters=supervision_mode == "sampled_prefix")
+                find_unused_parameters=supervision_mode != "all_positions")
 
     # TODO: wrap in create_optimizer.
     opt = torch.optim.AdamW(
@@ -363,6 +364,15 @@ def train_fn(
         raise ValueError("Checkpoint supervision mode differs from the requested mode")
     prefix_generator = torch.Generator(device=f"cuda:{rank}")
     benchmark_started = time.time()
+    previous_peak_memory = 0
+    if restore_from_ckpt and benchmark_output_dir:
+        history_file = Path(benchmark_output_dir) / "epochs.jsonl"
+        if history_file.exists():
+            history = [json.loads(line) for line in history_file.read_text().splitlines() if line.strip()]
+            if not history or history[-1]["epoch"] != checkpoint["epoch"]:
+                raise ValueError("Benchmark epoch records do not match the resume checkpoint")
+            benchmark_started -= history[-1]["elapsed_seconds"]
+            previous_peak_memory = max(row["peak_memory_bytes"] for row in history)
     best_hr10 = (checkpoint.get("best_hr10", checkpoint.get("metrics", {}).get("hr@10", float("-inf")))
                  if restore_from_ckpt else float("-inf"))
     if benchmark_output_dir:
@@ -428,6 +438,8 @@ def train_fn(
                 # Stateless per-step seeding also preserves cuts across epoch-boundary resume.
                 prefix_generator.manual_seed(random_seed + rank + batch_id * world_size)
                 seq_features, prefix_targets = sample_causal_prefix(seq_features, target_ids, prefix_generator)
+            elif supervision_mode == "full_prefix":
+                seq_features, prefix_targets = full_causal_prefix(seq_features, target_ids)
             else:
                 seq_features.past_ids.scatter_(
                     dim=1,
@@ -450,7 +462,7 @@ def train_fn(
             if sampling_strategy == "in-batch":
                 # get_item_embeddings currently assume 1-d tensor.
                 in_batch_ids = supervision_ids.view(-1)
-                if supervision_mode == "sampled_prefix":
+                if supervision_mode != "all_positions":
                     in_batch_ids = torch.cat([in_batch_ids, prefix_targets])
                 negatives_sampler.process_batch(
                     ids=in_batch_ids,
@@ -460,13 +472,13 @@ def train_fn(
             else:
                 negatives_sampler._item_emb = model.module._embedding_module._item_emb
 
-            if supervision_mode == "sampled_prefix":
+            if supervision_mode != "all_positions":
                 loss, aux_losses = model(
                     past_lengths=seq_features.past_lengths,
                     past_ids=seq_features.past_ids,
                     past_embeddings=input_embeddings,
                     past_payloads=seq_features.past_payloads,
-                    sampled_targets=prefix_targets,
+                    prefix_targets=prefix_targets,
                     negatives_sampler=negatives_sampler,
                     sampled_loss=ar_loss,
                 )
@@ -634,7 +646,7 @@ def train_fn(
                     "supervision_mode": supervision_mode, "target_exposures": target_exposures,
                     "parameter_count": sum(p.numel() for p in model.parameters()),
                     "best_hr10": is_best, "elapsed_seconds": time.time() - benchmark_started,
-                    "peak_memory_bytes": torch.cuda.max_memory_allocated(device)}) + "\n")
+                    "peak_memory_bytes": max(previous_peak_memory, torch.cuda.max_memory_allocated(device))}) + "\n")
         if rank == 0 and not benchmark_output_dir and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
             torch.save(
                 {

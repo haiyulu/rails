@@ -48,6 +48,8 @@ def jagged_check():
 
 def metrics_check():
     class Model:
+        _ndp_module = SimpleNamespace(requires_user_memory=False)
+
         def get_item_embeddings(self, ids):
             return ids.float().unsqueeze(-1)
 
